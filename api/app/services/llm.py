@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -26,7 +27,11 @@ class LLMService:
 
     def _register_clients(self, request_api_key: str | None) -> None:
         seen: set[str] = set()
-        for key in [request_api_key, self.settings.openai_api_key]:
+        for key in [
+            request_api_key,
+            self.settings.openai_api_key,
+            self._load_codex_auth_credential(),
+        ]:
             if not key or key in seen:
                 continue
             seen.add(key)
@@ -34,6 +39,32 @@ class LLMService:
             if self.settings.openai_base_url:
                 kwargs["base_url"] = self.settings.openai_base_url
             self.clients.append(OpenAI(**kwargs))
+
+    @staticmethod
+    def _load_codex_auth_credential() -> str | None:
+        """Load a credential from Codex/OpenClaw auth state when env key is unset.
+
+        Priority:
+        1) OPENAI_API_KEY field in ~/.codex/auth.json
+        2) OAuth access token in ~/.codex/auth.json tokens.access_token
+        """
+        auth_path = Path.home() / ".codex" / "auth.json"
+        if not auth_path.exists():
+            return None
+        try:
+            payload = json.loads(auth_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+        key = payload.get("OPENAI_API_KEY")
+        if isinstance(key, str) and key.strip():
+            return key.strip()
+
+        tokens = payload.get("tokens") if isinstance(payload, dict) else None
+        access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+        if isinstance(access_token, str) and access_token.strip():
+            return access_token.strip()
+        return None
 
     def _validate_enterprise_settings(self) -> None:
         base_url = self.settings.openai_base_url
@@ -304,6 +335,12 @@ class LLMService:
             if answer:
                 return {"answer": answer, "follow_up_questions": self._fallback_followups("oracle")}
             err = self.last_error or "No provider credentials configured."
+            if "api.responses.write" in err:
+                err = (
+                    f"{err} | Re-auth with Codex scopes and restart API: "
+                    "openclaw models auth login --provider openai-codex "
+                    "(or sign in again at http://localhost:3000/login)"
+                )
             return {
                 "answer": (
                     "LLM unavailable for direct Oracle chat. "

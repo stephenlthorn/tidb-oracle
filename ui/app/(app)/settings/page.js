@@ -68,6 +68,7 @@ export default async function SettingsPage() {
               { label: 'Retrieval Top-K', value: '8' },
               { label: 'Redact before LLM', value: 'Enabled' },
               { label: 'Direct API key', value: 'Set OPENAI_API_KEY in /Users/stephen/Documents/New project/.env for reliable Oracle responses' },
+              { label: 'Codex OAuth', value: 'Also reads ~/.codex/auth.json (OPENAI_API_KEY or tokens.access_token)' },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '0.5rem' }}>
                 <span style={{ color: 'var(--text-3)' }}>{label}</span>
