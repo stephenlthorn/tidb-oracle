@@ -1,0 +1,62 @@
+{
+  "chorus_call_id": "call_aurora_003_poc",
+  "metadata": {
+    "date": "2026-02-22",
+    "account": "Asteria Commerce",
+    "opportunity": "Aurora MySQL to distributed SQL modernization",
+    "stage": "POC planning",
+    "rep_email": "estyn.c@pingcap.com",
+    "se_email": "maya.t@pingcap.com"
+  },
+  "speaker_map": {
+    "S1": {"name": "Estyn C.", "role": "rep", "email": "estyn.c@pingcap.com"},
+    "S2": {"name": "Maya T.", "role": "se", "email": "maya.t@pingcap.com"},
+    "S3": {"name": "Riya Patel", "role": "customer", "email": null},
+    "S4": {"name": "Jon Keller", "role": "customer", "email": null},
+    "S5": {"name": "Dina Lopez", "role": "customer", "email": null}
+  },
+  "turns": [
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 9,
+      "end_time_sec": 44,
+      "text": "Let us agree on a four-week POC. Scope: one 12TB subset, streaming ingest, and representative checkout plus catalog query traffic."
+    },
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 45,
+      "end_time_sec": 83,
+      "text": "Success criteria for us: p95 read under 120 ms, write under 30 ms, and no customer-visible downtime during schema evolution tests."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 84,
+      "end_time_sec": 124,
+      "text": "We will also test failover recovery and establish target RTO under 60 seconds with clear runbooks for your SRE team."
+    },
+    {
+      "speaker_id": "S4",
+      "start_time_sec": 125,
+      "end_time_sec": 162,
+      "text": "Data migration plan matters. We need low-risk cutover from Aurora with repeatable checkpoints and reconciliation."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 163,
+      "end_time_sec": 203,
+      "text": "Agreed. We will propose a staged migration approach with validation checkpoints, rollback criteria, and side-by-side query verification."
+    },
+    {
+      "speaker_id": "S5",
+      "start_time_sec": 204,
+      "end_time_sec": 241,
+      "text": "Please include a cost model versus Aurora and show projected savings from reducing replica lag incidents and operational overhead."
+    },
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 242,
+      "end_time_sec": 274,
+      "text": "Action items: we send POC success matrix, required datasets, and next technical review invite by tomorrow."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "chorus_call_id": "call_12345",
+  "metadata": {
+    "date": "2026-02-17",
+    "account": "Evernorth",
+    "opportunity": "Distributed SQL evaluation",
+    "stage": "Technical validation",
+    "rep_email": "rep@pingcap.com",
+    "se_email": "se@pingcap.com"
+  },
+  "speaker_map": {
+    "S1": {"name": "Alice Rep", "role": "rep", "email": "rep@pingcap.com"},
+    "S2": {"name": "Bob SE", "role": "se", "email": "se@pingcap.com"},
+    "S3": {"name": "Customer Eng", "role": "customer", "email": null}
+  },
+  "turns": [
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 12,
+      "end_time_sec": 34,
+      "text": "We have a single table around 40TB logical and it may grow to 50TB this year."
+    },
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 35,
+      "end_time_sec": 58,
+      "text": "SingleStore told us compression could be 3x to 7x and they claim schema changes are easy."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 59,
+      "end_time_sec": 89,
+      "text": "Understood. We should validate online DDL behavior and discuss TiFlash sizing against your query mix."
+    },
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 90,
+      "end_time_sec": 121,
+      "text": "Next call we can walk through top UI queries, ingest windows, and the POC plan with latency targets."
+    }
+  ]
+}

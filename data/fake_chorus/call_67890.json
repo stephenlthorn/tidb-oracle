@@ -1,0 +1,29 @@
+{
+  "chorus_call_id": "call_67890",
+  "metadata": {
+    "date": "2026-02-18",
+    "account": "Northwind",
+    "opportunity": "HTAP modernization",
+    "stage": "Discovery",
+    "rep_email": "northwind.rep@pingcap.com",
+    "se_email": "northwind.se@pingcap.com"
+  },
+  "speaker_map": {
+    "S1": {"name": "NW Rep", "role": "rep", "email": "northwind.rep@pingcap.com"},
+    "S2": {"name": "NW Customer", "role": "customer", "email": null}
+  },
+  "turns": [
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 5,
+      "end_time_sec": 35,
+      "text": "Our concern is replication lag and analytics latency during ETL windows."
+    },
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 36,
+      "end_time_sec": 80,
+      "text": "We can phase TiFlash rollout and size by query classes instead of full-table replication first."
+    }
+  ]
+}

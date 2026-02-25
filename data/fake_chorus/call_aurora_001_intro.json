@@ -1,0 +1,55 @@
+{
+  "chorus_call_id": "call_aurora_001_intro",
+  "metadata": {
+    "date": "2026-02-20",
+    "account": "Asteria Commerce",
+    "opportunity": "Aurora MySQL to distributed SQL modernization",
+    "stage": "Intro discovery",
+    "rep_email": "estyn.c@pingcap.com",
+    "se_email": "maya.t@pingcap.com"
+  },
+  "speaker_map": {
+    "S1": {"name": "Estyn C.", "role": "rep", "email": "estyn.c@pingcap.com"},
+    "S2": {"name": "Maya T.", "role": "se", "email": "maya.t@pingcap.com"},
+    "S3": {"name": "Riya Patel", "role": "customer", "email": null},
+    "S4": {"name": "Jon Keller", "role": "customer", "email": null}
+  },
+  "turns": [
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 8,
+      "end_time_sec": 39,
+      "text": "We are on AWS Aurora MySQL and our primary order history table is around 50TB logical, growing about 1.3TB per month."
+    },
+    {
+      "speaker_id": "S4",
+      "start_time_sec": 40,
+      "end_time_sec": 76,
+      "text": "Peak traffic is roughly 11k writes per second and 35k reads per second during promo windows. Replica lag is a recurring issue."
+    },
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 77,
+      "end_time_sec": 112,
+      "text": "Helpful context. Are you evaluating this mainly for scale, availability, or cost pressure compared to current Aurora spend?"
+    },
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 113,
+      "end_time_sec": 152,
+      "text": "All three. We have weekly schema changes and online ALTER TABLE on large partitions is operationally painful and risky."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 153,
+      "end_time_sec": 191,
+      "text": "For next call we should map your top query classes, ETL windows, and strict p95 latency targets so we can shape architecture options."
+    },
+    {
+      "speaker_id": "S4",
+      "start_time_sec": 192,
+      "end_time_sec": 228,
+      "text": "Perfect. We also need cross-region recovery and lower operational toil during peak season."
+    }
+  ]
+}

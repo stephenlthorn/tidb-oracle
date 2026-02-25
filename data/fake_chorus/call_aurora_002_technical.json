@@ -1,0 +1,62 @@
+{
+  "chorus_call_id": "call_aurora_002_technical",
+  "metadata": {
+    "date": "2026-02-21",
+    "account": "Asteria Commerce",
+    "opportunity": "Aurora MySQL to distributed SQL modernization",
+    "stage": "Technical deep dive",
+    "rep_email": "estyn.c@pingcap.com",
+    "se_email": "maya.t@pingcap.com"
+  },
+  "speaker_map": {
+    "S1": {"name": "Estyn C.", "role": "rep", "email": "estyn.c@pingcap.com"},
+    "S2": {"name": "Maya T.", "role": "se", "email": "maya.t@pingcap.com"},
+    "S3": {"name": "Riya Patel", "role": "customer", "email": null},
+    "S4": {"name": "Jon Keller", "role": "customer", "email": null},
+    "S5": {"name": "Dina Lopez", "role": "customer", "email": null}
+  },
+  "turns": [
+    {
+      "speaker_id": "S5",
+      "start_time_sec": 12,
+      "end_time_sec": 46,
+      "text": "Question one: we rely heavily on MySQL compatibility including JSON columns, stored procedures in legacy services, and transactional semantics."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 47,
+      "end_time_sec": 88,
+      "text": "We can document compatibility by workload slice. For migration, we usually validate SQL features, transaction behavior, and index strategy using sampled production queries."
+    },
+    {
+      "speaker_id": "S4",
+      "start_time_sec": 89,
+      "end_time_sec": 126,
+      "text": "How do online schema changes behave at 50TB? We cannot absorb prolonged lock risk or late-night cutovers every sprint."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 127,
+      "end_time_sec": 170,
+      "text": "We should benchmark representative DDL operations in the POC and define acceptable impact windows. We will include rollback and guardrail procedures."
+    },
+    {
+      "speaker_id": "S3",
+      "start_time_sec": 171,
+      "end_time_sec": 207,
+      "text": "For analytics, product managers want near-real-time dashboards. Today we offload delayed extracts to Redshift and freshness is a pain."
+    },
+    {
+      "speaker_id": "S2",
+      "start_time_sec": 208,
+      "end_time_sec": 246,
+      "text": "Understood. We can evaluate HTAP patterns with a phased approach and measure query latency, freshness, and replication overhead by workload class."
+    },
+    {
+      "speaker_id": "S1",
+      "start_time_sec": 247,
+      "end_time_sec": 284,
+      "text": "We will send a technical questionnaire: top 20 read queries, top 10 write transactions, ETL schedule, and RPO/RTO goals."
+    }
+  ]
+}

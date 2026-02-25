@@ -1,0 +1,7 @@
+.git
+.DS_Store
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+ui/node_modules
+data/fake_drive/github
