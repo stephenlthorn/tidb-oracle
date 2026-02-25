@@ -176,6 +176,50 @@ class LLMService:
 
         return None
 
+    def _responses_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        tools: list[dict] | None = None,
+    ) -> str | None:
+        if not self.clients:
+            return None
+        import logging
+
+        logger = logging.getLogger(__name__)
+        safe_user_prompt = self._sanitize_for_provider(user_prompt)
+        kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": safe_user_prompt},
+            ],
+        }
+        if tools:
+            kwargs["tools"] = tools
+
+        for client in self.clients:
+            try:
+                response = client.responses.create(**kwargs)
+                output_text = getattr(response, "output_text", None)
+                if output_text and isinstance(output_text, str) and output_text.strip():
+                    return output_text.strip()
+
+                for item in getattr(response, "output", []) or []:
+                    if getattr(item, "type", "") != "message":
+                        continue
+                    for content in getattr(item, "content", []) or []:
+                        text = getattr(content, "text", None)
+                        if text and isinstance(text, str) and text.strip():
+                            return text.strip()
+            except Exception as exc:
+                logger.warning("LLM text call failed (%s: %s) — trying next path", type(exc).__name__, exc)
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                continue
+
+        return None
+
     def _local_oracle_synthesis(self, message: str, hits: list[RetrievedChunk]) -> str:
         focus_vocab = {
             "tiflash",
@@ -255,16 +299,10 @@ class LLMService:
         allow_ungrounded: bool = False,
     ) -> dict[str, Any]:
         if allow_ungrounded:
-            prompt = (
-                "User question:\n"
-                f"{message}\n\n"
-                "Return JSON with keys: answer (string), follow_up_questions (array of 3-7 strings). "
-                "Answer directly and practically for PingCAP GTM users."
-            )
-            llm = self._responses_json(SYSTEM_ORACLE, prompt, model=model, tools=tools)
-            if llm and isinstance(llm.get("answer"), str):
-                followups = llm.get("follow_up_questions") or self._fallback_followups("oracle")
-                return {"answer": llm["answer"], "follow_up_questions": followups[:7]}
+            prompt = f"User question:\n{message}\n\nProvide a concise, high-quality answer."
+            answer = self._responses_text(SYSTEM_ORACLE, prompt, model=model, tools=tools)
+            if answer:
+                return {"answer": answer, "follow_up_questions": self._fallback_followups("oracle")}
             err = self.last_error or "No provider credentials configured."
             return {
                 "answer": (

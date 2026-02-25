@@ -16,7 +16,7 @@ export function buildAuthUrl(verifier) {
     response_type: 'code',
     client_id: 'app_EMoamEEZ73f0CkXaXp7hrann',
     redirect_uri: 'http://localhost:1455/auth/callback',
-    scope: 'openid profile email offline_access',
+    scope: 'openid profile email offline_access api.responses.read api.responses.write',
     code_challenge: challenge,
     code_challenge_method: 'S256',
     state,

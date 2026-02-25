@@ -3,6 +3,7 @@ import { apiGet } from '../../../lib/api';
 
 export default async function SettingsPage() {
   const session = await getSession();
+  const hasSession = Boolean(session?.access_token);
 
   const expiresIn = session?.expires_at
     ? Math.max(0, Math.round((session.expires_at - Date.now()) / 1000 / 60))
@@ -29,7 +30,7 @@ export default async function SettingsPage() {
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">ChatGPT Account</span>
-            <span className="tag tag-green">Connected</span>
+            <span className={`tag ${hasSession ? 'tag-green' : ''}`}>{hasSession ? 'Connected' : 'Not connected'}</span>
           </div>
           <div className="panel-body" style={{ display: 'grid', gap: '0.75rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem 1rem', fontSize: '0.82rem' }}>
@@ -42,13 +43,17 @@ export default async function SettingsPage() {
                 {expiresIn > 0 ? `~${expiresIn} min` : 'Expired'}
               </span>
               <span style={{ color: 'var(--text-3)' }}>Auth method</span>
-              <span style={{ color: 'var(--text)' }}>ChatGPT OAuth PKCE</span>
+              <span style={{ color: 'var(--text)' }}>{hasSession ? 'ChatGPT OAuth PKCE' : 'None'}</span>
               <span style={{ color: 'var(--text-3)' }}>Client ID</span>
               <span style={{ color: 'var(--text-3)', fontSize: '0.72rem' }}>app_EMoamEEZ73f0CkXaXp7hrann</span>
             </div>
-            <form action="/api/auth/logout" method="POST" style={{ marginTop: '0.25rem' }}>
-              <button type="submit" className="btn btn-danger">Sign out</button>
-            </form>
+            {hasSession ? (
+              <form action="/api/auth/logout" method="POST" style={{ marginTop: '0.25rem' }}>
+                <button type="submit" className="btn btn-danger">Sign out</button>
+              </form>
+            ) : (
+              <a href="/login" className="btn btn-primary" style={{ display: 'inline-block', width: 'fit-content' }}>Login with ChatGPT</a>
+            )}
           </div>
         </div>
 
@@ -58,10 +63,11 @@ export default async function SettingsPage() {
           </div>
           <div className="panel-body" style={{ display: 'grid', gap: '0.5rem', fontSize: '0.82rem' }}>
             {[
-              { label: 'Model', value: `${liveModel} (via ChatGPT OAuth)` },
+              { label: 'Model', value: `${liveModel}` },
               { label: 'Embedding Model', value: 'text-embedding-3-small' },
               { label: 'Retrieval Top-K', value: '8' },
               { label: 'Redact before LLM', value: 'Enabled' },
+              { label: 'Direct API key', value: 'Set OPENAI_API_KEY in /Users/stephen/Documents/New project/.env for reliable Oracle responses' },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '0.5rem' }}>
                 <span style={{ color: 'var(--text-3)' }}>{label}</span>

@@ -47,7 +47,7 @@ export default function LoginPage() {
 
         <p className="login-heading">Sign in to continue</p>
         <p className="login-sub">
-          Uses your ChatGPT Plus or Pro subscription — no separate API key needed.
+          Uses ChatGPT OAuth. For guaranteed API access, you can also configure `OPENAI_API_KEY`.
         </p>
 
         {(errorParam || error) && (
@@ -68,8 +68,7 @@ export default function LoginPage() {
         </div>
 
         <div className="login-footer">
-          Internal only. Your ChatGPT session is used to power Oracle responses.
-          Tokens are stored in a short-lived httpOnly cookie and never logged.
+          Internal only. OAuth tokens are stored in a short-lived httpOnly cookie and never logged.
         </div>
       </div>
     </div>

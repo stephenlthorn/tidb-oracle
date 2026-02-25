@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     openai_base_url: str | None = None
     openai_api_key: str | None = None
-    openai_model: str = "gpt-4.1-mini"
+    openai_model: str = "gpt-4.1"
     openai_embedding_model: str = "text-embedding-3-small"
     enterprise_mode: bool = False
     security_require_private_llm_endpoint: bool = False

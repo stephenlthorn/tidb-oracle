@@ -16,7 +16,7 @@ const UTILITY = [
   { href: '/settings', label: 'Settings', icon: '⚙' },
 ];
 
-export default function Sidebar({ email }) {
+export default function Sidebar({ email, hasSession = false }) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -67,15 +67,22 @@ export default function Sidebar({ email }) {
           <div className="user-dot" />
           <div className="user-email">{email}</div>
         </div>
-        <button
-          className="nav-link btn-ghost"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          style={{ width: '100%' }}
-        >
-          <span className="nav-link-icon">→</span>
-          {loggingOut ? 'Signing out...' : 'Sign out'}
-        </button>
+        {hasSession ? (
+          <button
+            className="nav-link btn-ghost"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            style={{ width: '100%' }}
+          >
+            <span className="nav-link-icon">→</span>
+            {loggingOut ? 'Signing out...' : 'Sign out'}
+          </button>
+        ) : (
+          <Link href="/login" className="nav-link btn-ghost" style={{ width: '100%' }}>
+            <span className="nav-link-icon">→</span>
+            Login
+          </Link>
+        )}
       </div>
     </aside>
   );
