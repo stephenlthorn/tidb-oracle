@@ -19,6 +19,7 @@ class LLMService:
         self.model = self.settings.openai_model
         self._validate_enterprise_settings()
         self.clients: list[OpenAI] = []
+        self.last_error: str | None = None
         self._register_clients(api_key)
         if not self.clients and self.settings.security_fail_closed_on_missing_llm_key:
             raise RuntimeError("OPENAI_API_KEY is required by security policy for LLM calls.")
@@ -170,6 +171,7 @@ class LLMService:
                     return None
             except Exception as exc:
                 logger.warning("LLM call failed (%s: %s) — trying next path", type(exc).__name__, exc)
+                self.last_error = f"{type(exc).__name__}: {exc}"
                 continue
 
         return None
@@ -243,7 +245,38 @@ class LLMService:
             f"Based on this evidence, a practical next step is to validate this against the exact ask: \"{message}\"."
         )
 
-    def answer_oracle(self, message: str, hits: list[RetrievedChunk], *, model: str | None = None, tools: list[dict] | None = None) -> dict[str, Any]:
+    def answer_oracle(
+        self,
+        message: str,
+        hits: list[RetrievedChunk],
+        *,
+        model: str | None = None,
+        tools: list[dict] | None = None,
+        allow_ungrounded: bool = False,
+    ) -> dict[str, Any]:
+        if allow_ungrounded:
+            prompt = (
+                "User question:\n"
+                f"{message}\n\n"
+                "Return JSON with keys: answer (string), follow_up_questions (array of 3-7 strings). "
+                "Answer directly and practically for PingCAP GTM users."
+            )
+            llm = self._responses_json(SYSTEM_ORACLE, prompt, model=model, tools=tools)
+            if llm and isinstance(llm.get("answer"), str):
+                followups = llm.get("follow_up_questions") or self._fallback_followups("oracle")
+                return {"answer": llm["answer"], "follow_up_questions": followups[:7]}
+            err = self.last_error or "No provider credentials configured."
+            return {
+                "answer": (
+                    "LLM unavailable for direct Oracle chat. "
+                    "Set `OPENAI_API_KEY` in `/Users/stephen/Documents/New project/.env` "
+                    "or connect a token with `api.responses.write` scope. "
+                    f"Latest error: {err}"
+                ),
+                "citations": [],
+                "follow_up_questions": [],
+            }
+
         if not hits:
             return {
                 "answer": (

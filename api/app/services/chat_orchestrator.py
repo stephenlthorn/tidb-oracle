@@ -8,18 +8,16 @@ from sqlalchemy.orm import Session
 from app.core.settings import Settings, get_settings
 from app.models import KBConfig, SourceType
 from app.retrieval.service import HybridRetriever
-from app.retrieval.tidb_docs import TiDBDocsRetriever
 from app.services.llm import LLMService
 from app.services.query_rewrite import QueryRewriter
 from app.utils.email_utils import is_internal_email
 
 
 class ChatOrchestrator:
-    def __init__(self, db: Session, openai_token: str | None = None) -> None:
+    def __init__(self, db: Session | None, openai_token: str | None = None) -> None:
         self.db = db
         self.settings = get_settings()
-        self.retriever = HybridRetriever(db)
-        self.docs_retriever = TiDBDocsRetriever()
+        self.retriever = HybridRetriever(db) if db is not None else None
         self.llm = LLMService(api_key=openai_token)
         self.rewriter = QueryRewriter()
 
@@ -216,6 +214,29 @@ class ChatOrchestrator:
             }
             return payload, {"top_k": 0, "results": []}
 
+        # Oracle mode runs as direct LLM chat only (no internal KB retrieval).
+        if mode == "oracle":
+            llm_model, llm_tools = self._resolve_llm_config(None, self.settings, mode)
+            data = self.llm.answer_oracle(
+                message,
+                [],
+                model=llm_model,
+                tools=llm_tools,
+                allow_ungrounded=True,
+            )
+            data["citations"] = []
+            return data, {"top_k": 0, "results": []}
+
+        if self.db is None or self.retriever is None:
+            data = {
+                "what_happened": ["Transcript mode is unavailable because the internal DB is disabled."],
+                "risks": ["Enable internal DB-backed retrieval to use call assistant mode."],
+                "next_steps": ["Use `oracle` mode for direct LLM chat in the meantime."],
+                "questions_to_ask_next_call": self.llm._fallback_followups("call_assistant"),
+                "citations": [],
+            }
+            return data, {"top_k": 0, "results": []}
+
         kb_config: KBConfig | None = self.db.get(KBConfig, 1)
         resolved_top_k = self._resolve_top_k(kb_config, top_k)
         allowed_sources = self._resolve_allowed_sources(kb_config, mode)
@@ -235,12 +256,6 @@ class ChatOrchestrator:
 
         rewritten = self.rewriter.rewrite(message, mode)
         hits = self.retriever.search(rewritten, top_k=resolved_top_k, filters=mode_filters)
-        if mode == "oracle":
-            online_hits = self.docs_retriever.search(rewritten, max_results=5)
-            hits = hits + online_hits
-            hits = self._rerank_oracle_hits(message, hits)
-            high_quality = self._oracle_high_quality_hits(message, hits)
-            hits = (high_quality or hits)[:resolved_top_k]
 
         citations = [
             {
