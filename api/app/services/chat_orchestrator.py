@@ -39,6 +39,132 @@ class ChatOrchestrator:
         words = re.sub(r"\s+", " ", text).strip().split()
         return " ".join(words[:25])
 
+    @staticmethod
+    def _query_terms(query: str) -> list[str]:
+        tokens = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9._-]{1,}", query.lower())
+        stop = {
+            "what",
+            "where",
+            "when",
+            "which",
+            "who",
+            "why",
+            "how",
+            "are",
+            "the",
+            "for",
+            "and",
+            "with",
+            "from",
+            "into",
+            "this",
+            "that",
+            "your",
+            "ours",
+            "their",
+            "about",
+            "should",
+            "could",
+            "would",
+            "please",
+            "show",
+            "tell",
+            "give",
+        }
+        seen: set[str] = set()
+        terms: list[str] = []
+        for token in tokens:
+            if len(token) < 3 or token in stop:
+                continue
+            if token not in seen:
+                terms.append(token)
+                seen.add(token)
+        return terms
+
+    @classmethod
+    def _lexical_overlap(cls, text: str, query: str) -> float:
+        terms = cls._query_terms(query)
+        if not terms:
+            return 0.0
+        lowered = text.lower()
+        matches = sum(1 for term in terms if cls._contains_term(lowered, term))
+        return matches / max(1, len(terms))
+
+    def _rerank_oracle_hits(self, query: str, hits: list) -> list:
+        if not hits:
+            return hits
+        critical = {
+            "tiflash",
+            "tikv",
+            "htap",
+            "replication",
+            "lag",
+            "aurora",
+            "mysql",
+            "mpp",
+            "ddl",
+            "migration",
+            "poc",
+        }
+        query_terms = self._query_terms(query)
+
+        def score(hit) -> float:
+            body = f"{hit.title}\n{hit.text[:1500]}"
+            overlap = self._lexical_overlap(body, query)
+            lowered = body.lower()
+            matched_critical = sum(
+                1 for t in query_terms if t in critical and self._contains_term(lowered, t)
+            )
+            nav_penalty = 0.0
+            title = (hit.title or "").lower()
+            if title.endswith("/toc.md") or title.endswith("toc.md") or title.endswith("_index.md"):
+                nav_penalty -= 0.30
+            if title.endswith("/overview.md") or title.endswith("overview.md") or title.endswith("glossary.md"):
+                nav_penalty -= 0.16
+            if title in {"overview", "glossary", "toc"}:
+                nav_penalty -= 0.18
+            source_boost = 0.08 if hit.source_type == SourceType.TIDB_DOCS_ONLINE.value else 0.0
+            return (0.42 * hit.score) + (0.58 * overlap) + min(0.24, matched_critical * 0.08) + source_boost + nav_penalty
+
+        ranked = sorted(hits, key=score, reverse=True)
+        return ranked
+
+    def _oracle_high_quality_hits(self, query: str, hits: list) -> list:
+        if not hits:
+            return []
+        focus_terms = {
+            "tiflash",
+            "tikv",
+            "htap",
+            "replication",
+            "lag",
+            "aurora",
+            "mysql",
+            "mpp",
+            "ddl",
+            "migration",
+            "poc",
+        }
+        query_terms = self._query_terms(query)
+        query_focus = [term for term in query_terms if term in focus_terms]
+        required_focus = 1
+        if "replication" in query_focus and "lag" in query_focus:
+            required_focus = 3
+        filtered = []
+        for hit in hits:
+            body = f"{hit.title}\n{hit.text[:1600]}".lower()
+            overlap = self._lexical_overlap(body, query)
+            if overlap < 0.16:
+                continue
+            if query_focus:
+                matched_focus = sum(1 for term in query_focus if self._contains_term(body, term))
+                if "tiflash" in query_focus and not self._contains_term(body, "tiflash"):
+                    continue
+                if matched_focus < required_focus:
+                    continue
+            filtered.append(hit)
+        return filtered
+
     def _resolve_top_k(self, kb_config: KBConfig | None, request_top_k: int) -> int:
         if kb_config is not None:
             return kb_config.retrieval_top_k
@@ -110,8 +236,11 @@ class ChatOrchestrator:
         rewritten = self.rewriter.rewrite(message, mode)
         hits = self.retriever.search(rewritten, top_k=resolved_top_k, filters=mode_filters)
         if mode == "oracle":
-            online_hits = self.docs_retriever.search(rewritten, max_results=3)
+            online_hits = self.docs_retriever.search(rewritten, max_results=5)
             hits = hits + online_hits
+            hits = self._rerank_oracle_hits(message, hits)
+            high_quality = self._oracle_high_quality_hits(message, hits)
+            hits = (high_quality or hits)[:resolved_top_k]
 
         citations = [
             {
@@ -124,7 +253,7 @@ class ChatOrchestrator:
                 "file_id": hit.file_id,
                 "timestamp": hit.metadata.get("start_time_sec"),
             }
-            for hit in hits
+            for hit in hits[:8]
         ]
 
         if mode == "call_assistant":
@@ -135,3 +264,7 @@ class ChatOrchestrator:
         data = self.llm.answer_oracle(message, hits, model=llm_model, tools=llm_tools)
         data["citations"] = citations
         return data, self.retriever.retrieval_payload(hits, resolved_top_k)
+    @staticmethod
+    def _contains_term(haystack: str, term: str) -> bool:
+        pattern = rf"(?<![a-z0-9_]){re.escape(term)}(?![a-z0-9_])"
+        return re.search(pattern, haystack) is not None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from dataclasses import asdict
 
@@ -36,12 +37,66 @@ class HybridRetriever:
         return dot / (na * nb)
 
     @staticmethod
+    def _contains_term(haystack: str, term: str) -> bool:
+        pattern = rf"(?<![a-z0-9_]){re.escape(term)}(?![a-z0-9_])"
+        return re.search(pattern, haystack) is not None
+
+    @staticmethod
+    def _query_terms(query: str) -> list[str]:
+        tokens = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9._-]{1,}", query.lower())
+        stop = {
+            "what",
+            "where",
+            "when",
+            "which",
+            "who",
+            "why",
+            "how",
+            "are",
+            "the",
+            "for",
+            "and",
+            "with",
+            "from",
+            "into",
+            "this",
+            "that",
+            "your",
+            "ours",
+            "their",
+            "about",
+            "should",
+            "could",
+            "would",
+            "please",
+            "show",
+            "tell",
+            "give",
+        }
+        seen: set[str] = set()
+        terms: list[str] = []
+        for token in tokens:
+            if len(token) < 3 or token in stop:
+                continue
+            if token not in seen:
+                terms.append(token)
+                seen.add(token)
+        return terms
+
+    @staticmethod
     def _keyword_score(text: str, terms: list[str]) -> float:
         if not terms:
             return 0.0
         lowered = text.lower()
-        count = Counter(term for term in terms if term and term in lowered)
-        return min(1.0, sum(count.values()) / max(1, len(terms)))
+        count = Counter(term for term in terms if term and HybridRetriever._contains_term(lowered, term))
+        if not count:
+            return 0.0
+        weighted_hits = 0.0
+        for term, term_count in count.items():
+            weight = 1.0 + min(len(term), 12) / 20.0
+            weighted_hits += weight * term_count
+        denom = max(1.0, len(terms) * 1.3)
+        return min(1.0, weighted_hits / denom)
 
     @staticmethod
     def _apply_filters(doc: KBDocument, filters: dict) -> bool:
@@ -62,19 +117,52 @@ class HybridRetriever:
         title = (doc.title or "").lower()
         bias = 0.0
         if title.startswith("github/pingcap__docs/"):
-            bias += 0.18
-        if title.endswith((".md", ".markdown", ".rst", ".adoc")):
             bias += 0.08
+        if title.endswith((".md", ".markdown", ".rst", ".adoc")):
+            bias += 0.03
 
         if "/test/" in title or "/tests/" in title or title.endswith("_test.go"):
             bias -= 0.20
         elif title.endswith((".go", ".java", ".kt", ".py", ".js", ".jsx", ".ts", ".tsx", ".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".proto")):
             bias -= 0.05
+
+        # Changelogs/release notes often match generic terms but are weak primary evidence.
+        if "/releases/" in title or "release-" in title:
+            bias -= 0.10
+        if title.endswith("/toc.md") or title.endswith("toc.md") or title.endswith("_index.md"):
+            bias -= 0.24
+        if title.endswith("/overview.md") or title.endswith("overview.md") or title.endswith("glossary.md"):
+            bias -= 0.12
         return bias
+
+    @staticmethod
+    def _domain_term_boost(query_terms: list[str], title: str, text: str) -> float:
+        if not query_terms:
+            return 0.0
+        focused_terms = {
+            "tiflash",
+            "tikv",
+            "htap",
+            "replication",
+            "lag",
+            "aurora",
+            "mysql",
+            "mpp",
+            "ddl",
+            "migration",
+            "poc",
+        }
+        terms = [term for term in query_terms if term in focused_terms]
+        if not terms:
+            return 0.0
+        haystack = f"{title}\n{text[:1400]}".lower()
+        matched = sum(1 for term in terms if HybridRetriever._contains_term(haystack, term))
+        return min(0.24, matched * 0.07)
 
     def search(self, query: str, *, top_k: int = 8, filters: dict | None = None) -> list[RetrievedChunk]:
         filters = filters or {}
-        terms = [term.strip().lower() for term in query.split() if len(term.strip()) > 2]
+        terms = self._query_terms(query)
+        semantic_available = bool(getattr(self.embedder, "client", None))
         q_vec = self.embedder.embed(query)
         dialect = (self.db.bind.dialect.name if self.db.bind is not None else "").lower()
 
@@ -88,12 +176,13 @@ class HybridRetriever:
         rows: list[tuple[KBChunk, KBDocument]] = []
         if dialect == "postgresql":
             try:
-                vector_rows = self.db.execute(
-                    base_stmt.where(KBChunk.embedding.is_not(None))
-                    .order_by(KBChunk.embedding.cosine_distance(q_vec))
-                    .limit(candidate_limit)
-                ).all()
-                rows.extend(vector_rows)
+                if semantic_available:
+                    vector_rows = self.db.execute(
+                        base_stmt.where(KBChunk.embedding.is_not(None))
+                        .order_by(KBChunk.embedding.cosine_distance(q_vec))
+                        .limit(candidate_limit)
+                    ).all()
+                    rows.extend(vector_rows)
             except Exception:
                 # Fallback if pgvector ordering fails in a specific environment.
                 rows.extend(self.db.execute(base_stmt.limit(candidate_limit)).all())
@@ -118,7 +207,15 @@ class HybridRetriever:
                 continue
             vec_score = (self._cosine(chunk.embedding, q_vec) + 1) / 2
             kw_score = self._keyword_score(chunk.text, terms)
-            score = (0.7 * vec_score) + (0.3 * kw_score) + self._source_bias(doc)
+            title_score = self._keyword_score(doc.title or "", terms)
+            domain_boost = self._domain_term_boost(terms, doc.title or "", chunk.text)
+            if semantic_available:
+                score = (0.50 * vec_score) + (0.30 * kw_score) + (0.10 * title_score) + self._source_bias(doc) + domain_boost
+            else:
+                # No real semantic model: rely on lexical matching and suppress random hash-vector influence.
+                score = (0.05 * vec_score) + (0.68 * kw_score) + (0.17 * title_score) + self._source_bias(doc) + domain_boost
+                if kw_score < 0.18 and title_score < 0.25:
+                    continue
             score = max(0.0, min(1.0, score))
             if score <= 0:
                 continue

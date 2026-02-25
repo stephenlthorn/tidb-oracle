@@ -36,6 +36,11 @@ _KEYWORD_DOC_URLS = [
     ("storage", "https://docs.pingcap.com/tidb/stable/tidb-storage"),
     ("architecture", "https://docs.pingcap.com/tidb/stable/tidb-architecture"),
     ("security", "https://docs.pingcap.com/tidb/stable/best-practices-for-security-configuration"),
+    ("tiflash", "https://docs.pingcap.com/tidb/stable/tiflash/tiflash-overview"),
+    ("htap", "https://docs.pingcap.com/tidb/stable/explore-htap"),
+    ("replication", "https://docs.pingcap.com/tidb/stable/tiflash/create-tiflash-replicas"),
+    ("lag", "https://docs.pingcap.com/tidb/stable/information-schema/information-schema-tiflash-replica"),
+    ("mpp", "https://docs.pingcap.com/tidb/stable/tiflash/use-tiflash-mpp-mode"),
 ]
 
 

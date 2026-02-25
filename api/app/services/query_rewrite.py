@@ -9,7 +9,8 @@ class QueryRewriter:
         words = [w.strip() for w in text.replace("?", " ").split() if w.strip()]
         dedup = list(OrderedDict((w.lower(), w) for w in words).values())
         if mode == "oracle":
-            dedup.extend(["TiDB", "GTM", "enablement"])
+            if "tidb" not in {w.lower() for w in dedup}:
+                dedup.append("TiDB")
         if mode == "call_assistant":
             dedup.extend(["transcript", "next steps", "risks"])
         return " ".join(dedup)
