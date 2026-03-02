@@ -73,6 +73,13 @@ cd infra
 docker compose up --build
 ```
 
+Optional: runtime Google service-account secret mount (no secret in image):
+
+```bash
+export GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_FILE=/abs/path/service-account.json
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build
+```
+
 3. Run initial sync:
 
 ```bash
@@ -198,6 +205,8 @@ Supported modes:
 
 2. Service account (optional legacy mode for shared system sync)
 - Set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON=/abs/path/service-account.json`
+- For containers, mount that file at runtime (for example into `/run/secrets/service-account.json`) and set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` to the mounted path.
+- If using Docker Compose, prefer `infra/docker-compose.secrets.yml` and set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_FILE`.
 - Share target Drive folders/files with the service account.
 
 3. OAuth client token file (legacy local mode)
