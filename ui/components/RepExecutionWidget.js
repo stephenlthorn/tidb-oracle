@@ -27,6 +27,7 @@ export default function RepExecutionWidget() {
   const [questions, setQuestions] = useState(null);
   const [risk, setRisk] = useState(null);
   const [draft, setDraft] = useState(null);
+  const [fullSolution, setFullSolution] = useState(null);
 
   const [loadingAction, setLoadingAction] = useState('');
   const [error, setError] = useState('');
@@ -60,6 +61,13 @@ export default function RepExecutionWidget() {
         payload.cc = cc.split(',').map((s) => s.trim()).filter(Boolean);
         payload.mode = mode;
         payload.tone = tone;
+      } else if (action === 'full') {
+        path = '/api/rep/full-solution';
+        payload.count = Number(count) || 6;
+        payload.to = to.split(',').map((s) => s.trim()).filter(Boolean);
+        payload.cc = cc.split(',').map((s) => s.trim()).filter(Boolean);
+        payload.mode = mode;
+        payload.tone = tone;
       }
 
       const res = await fetch(path, {
@@ -76,6 +84,13 @@ export default function RepExecutionWidget() {
       if (action === 'questions') setQuestions(data);
       if (action === 'risk') setRisk(data);
       if (action === 'draft') setDraft(data);
+      if (action === 'full') {
+        setFullSolution(data);
+        setBrief(data.account_brief || null);
+        setQuestions(data.discovery_questions || null);
+        setRisk(data.deal_risk || null);
+        setDraft(data.follow_up_draft || null);
+      }
     } catch (err) {
       setError(String(err?.message || err));
     } finally {
@@ -87,7 +102,7 @@ export default function RepExecutionWidget() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">Rep Automation</span>
-        <span className="tag">Phase 1</span>
+        <span className="tag">Phase 1-3</span>
       </div>
       <div className="panel-body" style={{ display: 'grid', gap: '0.75rem' }}>
         <div className="two-col" style={{ gap: '0.75rem' }}>
@@ -109,6 +124,9 @@ export default function RepExecutionWidget() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => run('full')} disabled={Boolean(loadingAction)}>
+            {loadingAction === 'full' ? 'Generating…' : 'Generate Full Solution (Phases 1-3)'}
+          </button>
           <button className="btn" onClick={() => run('brief')} disabled={Boolean(loadingAction)}>
             {loadingAction === 'brief' ? 'Generating…' : 'Generate Account Brief'}
           </button>
@@ -159,8 +177,22 @@ export default function RepExecutionWidget() {
 
         {error ? <div className="error-text">{error}</div> : null}
 
-        {(brief || questions || risk || draft) && (
+        {(fullSolution || brief || questions || risk || draft) && (
           <div className="answer-box" style={{ display: 'grid', gap: '0.6rem' }}>
+            {fullSolution && (
+              <Section title="Full Solution Summary">
+                <ul className="citation-list">
+                  {(fullSolution.phase_2_execution_focus || []).map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <div className="citation-label" style={{ marginTop: '0.6rem', marginBottom: '0.35rem' }}>
+                  Phase 3 Automation
+                </div>
+                <ul className="citation-list">
+                  {(fullSolution.phase_3_automation_next_steps || []).map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </Section>
+            )}
+
             {brief && (
               <Section title="Account Brief">
                 <div className="answer-text">{brief.summary}</div>

@@ -19,7 +19,7 @@ export default function MarketingPage() {
       <div className="content">
         <div className="kpi-row">
           {[
-            { label: 'Module Set', value: '1', sub: 'Marketing Intelligence' },
+            { label: 'Module Set', value: '2', sub: 'Phase 1-3 · Intelligence + campaign orchestration' },
             { label: 'Status', value: 'Live', sub: 'Connected to backend endpoint' },
             { label: 'Persona', value: 'Marketing', sub: 'Prompt-aware outputs' },
           ].map((m) => (

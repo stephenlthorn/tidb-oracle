@@ -15,6 +15,7 @@ export default function SEExecutionWidget() {
   const [readiness, setReadiness] = useState(null);
   const [architecture, setArchitecture] = useState(null);
   const [coach, setCoach] = useState(null);
+  const [fullSolution, setFullSolution] = useState(null);
 
   const [loading, setLoading] = useState('');
   const [error, setError] = useState('');
@@ -40,6 +41,10 @@ export default function SEExecutionWidget() {
     } else if (kind === 'competitor-coach') {
       path = '/api/se/competitor-coach';
       payload.competitor = competitor;
+    } else if (kind === 'full') {
+      path = '/api/se/full-solution';
+      payload.target_offering = targetOffering;
+      payload.competitor = competitor;
     }
 
     setLoading(kind);
@@ -58,6 +63,13 @@ export default function SEExecutionWidget() {
       if (kind === 'poc-readiness') setReadiness(data);
       if (kind === 'architecture-fit') setArchitecture(data);
       if (kind === 'competitor-coach') setCoach(data);
+      if (kind === 'full') {
+        setFullSolution(data);
+        setPocPlan(data.poc_plan || null);
+        setReadiness(data.poc_readiness || null);
+        setArchitecture(data.architecture_fit || null);
+        setCoach(data.competitor_coach || null);
+      }
     } catch (err) {
       setError(String(err?.message || err));
     } finally {
@@ -69,7 +81,7 @@ export default function SEExecutionWidget() {
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">SE Automation</span>
-        <span className="tag">Phase 1</span>
+        <span className="tag">Phase 1-3</span>
       </div>
       <div className="panel-body" style={{ display: 'grid', gap: '0.75rem' }}>
         <div className="two-col" style={{ gap: '0.75rem' }}>
@@ -106,6 +118,9 @@ export default function SEExecutionWidget() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => run('full')} disabled={Boolean(loading)}>
+            {loading === 'full' ? 'Generating…' : 'Generate Full Solution (Phases 1-3)'}
+          </button>
           <button className="btn btn-primary" onClick={() => run('poc-plan')} disabled={Boolean(loading)}>
             {loading === 'poc-plan' ? 'Generating…' : 'Generate POC Plan'}
           </button>
@@ -122,8 +137,21 @@ export default function SEExecutionWidget() {
 
         {error ? <div className="error-text">{error}</div> : null}
 
-        {(pocPlan || readiness || architecture || coach) && (
+        {(fullSolution || pocPlan || readiness || architecture || coach) && (
           <div className="answer-box" style={{ display: 'grid', gap: '0.65rem' }}>
+            {fullSolution && (
+              <div>
+                <div className="citation-label">Full Solution Validation Matrix</div>
+                <ul className="citation-list">
+                  {(fullSolution.phase_2_validation_matrix || []).map((item, idx) => (
+                    <li key={`${item.check}-${idx}`}>
+                      {item.check}: {item.target} ({item.owner})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {pocPlan && (
               <div>
                 <div className="citation-label">POC Plan ({pocPlan.status}, {pocPlan.readiness_score}/100)</div>

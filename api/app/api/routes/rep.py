@@ -12,6 +12,8 @@ from app.schemas.gtm_modules import (
     RepDealRiskResponse,
     RepDiscoveryQuestionsRequest,
     RepDiscoveryQuestionsResponse,
+    RepFullSolutionRequest,
+    RepFullSolutionResponse,
     RepFollowUpDraftRequest,
     RepFollowUpDraftResponse,
 )
@@ -220,6 +222,51 @@ def rep_deal_risk(
             db,
             actor=req.user,
             action="rep_deal_risk",
+            input_payload=req.model_dump(),
+            retrieval_payload={},
+            output_payload={},
+            status=AuditStatus.ERROR,
+            error_message=str(exc),
+        )
+        raise
+
+
+@router.post("/full-solution", response_model=RepFullSolutionResponse)
+def rep_full_solution(
+    req: RepFullSolutionRequest,
+    request: Request,
+    db: Session = Depends(db_session),
+) -> dict:
+    openai_token = request.headers.get("X-OpenAI-Token")
+    service = GTMModuleService(db, openai_token=openai_token)
+    _ensure_enabled(service, "rep_full_solution")
+    try:
+        data, retrieval = service.rep_full_solution(
+            user=req.user,
+            account=req.account,
+            chorus_call_id=req.chorus_call_id,
+            count=req.count,
+            requested_mode=req.mode,
+            to=req.to,
+            cc=req.cc,
+            tone=req.tone,
+        )
+        write_audit_log(
+            db,
+            actor=req.user,
+            action="rep_full_solution",
+            input_payload=req.model_dump(),
+            retrieval_payload=retrieval,
+            output_payload=data,
+            status=AuditStatus.OK,
+        )
+        return data
+    except Exception as exc:
+        db.rollback()
+        write_audit_log(
+            db,
+            actor=req.user,
+            action="rep_full_solution",
             input_payload=req.model_dump(),
             retrieval_payload={},
             output_payload={},

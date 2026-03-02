@@ -17,7 +17,7 @@ export default function SEPage() {
       <div className="content">
         <div className="kpi-row">
           {[
-            { label: 'Module Set', value: '4', sub: 'POC · Readiness · Fit · Competitor' },
+            { label: 'Module Set', value: '5', sub: 'Phase 1-3 · Core technical + full orchestration' },
             { label: 'Status', value: 'Live', sub: 'Connected to backend endpoints' },
             { label: 'Persona', value: 'SE', sub: 'Prompt-aware outputs' },
           ].map((k) => (

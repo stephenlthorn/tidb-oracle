@@ -10,6 +10,8 @@ from app.schemas.gtm_modules import (
     SEArchitectureFitResponse,
     SECompetitorCoachRequest,
     SECompetitorCoachResponse,
+    SEFullSolutionRequest,
+    SEFullSolutionResponse,
     SEPocPlanRequest,
     SEPocPlanResponse,
     SEPocReadinessRequest,
@@ -163,6 +165,44 @@ def se_competitor_coach(req: SECompetitorCoachRequest, request: Request, db: Ses
             db,
             actor=req.user,
             action="se_competitor_coach",
+            input_payload=req.model_dump(),
+            retrieval_payload={},
+            output_payload={},
+            status=AuditStatus.ERROR,
+            error_message=str(exc),
+        )
+        raise
+
+
+@router.post("/full-solution", response_model=SEFullSolutionResponse)
+def se_full_solution(req: SEFullSolutionRequest, request: Request, db: Session = Depends(db_session)) -> dict:
+    openai_token = request.headers.get("X-OpenAI-Token")
+    service = GTMModuleService(db, openai_token=openai_token)
+    _ensure_enabled(service, "se_full_solution")
+    try:
+        data, retrieval = service.se_full_solution(
+            user=req.user,
+            account=req.account,
+            chorus_call_id=req.chorus_call_id,
+            target_offering=req.target_offering,
+            competitor=req.competitor,
+        )
+        write_audit_log(
+            db,
+            actor=req.user,
+            action="se_full_solution",
+            input_payload=req.model_dump(),
+            retrieval_payload=retrieval,
+            output_payload=data,
+            status=AuditStatus.OK,
+        )
+        return data
+    except Exception as exc:
+        db.rollback()
+        write_audit_log(
+            db,
+            actor=req.user,
+            action="se_full_solution",
             input_payload=req.model_dump(),
             retrieval_payload={},
             output_payload={},

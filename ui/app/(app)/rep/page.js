@@ -18,7 +18,7 @@ export default function RepPage() {
       <div className="content">
         <div className="kpi-row">
           {[
-            { label: 'Module Set', value: '4', sub: 'Brief · Questions · Risk · Follow-Up' },
+            { label: 'Module Set', value: '6', sub: 'Phase 1-3 · Core modules + full orchestration' },
             { label: 'Status', value: 'Live', sub: 'Connected to backend endpoints' },
             { label: 'Persona', value: 'Rep', sub: 'Prompt-aware outputs' },
           ].map((k) => (

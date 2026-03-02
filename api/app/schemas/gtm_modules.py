@@ -162,3 +162,75 @@ class MarketingIntelligenceResponse(BaseModel):
     campaign_angles: list[str]
     priority_accounts: list[str]
     next_actions: list[str]
+
+
+class AssetPackItem(BaseModel):
+    asset_type: str
+    title: str
+    owner: str
+    purpose: str
+
+
+class RepFullSolutionRequest(BaseModel):
+    user: str = "oracle@pingcap.com"
+    account: str
+    chorus_call_id: str | None = None
+    count: int = Field(default=6, ge=3, le=12)
+    mode: MessageMode = "draft"
+    to: list[str] = Field(default_factory=list)
+    cc: list[str] = Field(default_factory=list)
+    tone: str = "crisp"
+
+
+class RepFullSolutionResponse(BaseModel):
+    account: str
+    phase_1_modules: list[str]
+    account_brief: RepAccountBriefResponse
+    discovery_questions: RepDiscoveryQuestionsResponse
+    deal_risk: RepDealRiskResponse
+    follow_up_draft: RepFollowUpDraftResponse
+    phase_2_execution_focus: list[str]
+    phase_2_weekly_cadence: list[str]
+    phase_3_assets: list[AssetPackItem]
+    phase_3_automation_next_steps: list[str]
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class SEFullSolutionRequest(BaseModel):
+    user: str = "oracle@pingcap.com"
+    account: str
+    chorus_call_id: str | None = None
+    target_offering: str = "TiDB Cloud Dedicated"
+    competitor: str | None = None
+
+
+class SEFullSolutionResponse(BaseModel):
+    account: str
+    phase_1_modules: list[str]
+    poc_plan: SEPocPlanResponse
+    poc_readiness: SEPocReadinessResponse
+    architecture_fit: SEArchitectureFitResponse
+    competitor_coach: SECompetitorCoachResponse
+    phase_2_validation_matrix: list[dict[str, str]]
+    phase_2_red_flags: list[str]
+    phase_3_assets: list[AssetPackItem]
+    phase_3_handoff_notes: list[str]
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class MarketingFullSolutionRequest(BaseModel):
+    user: str = "oracle@pingcap.com"
+    regions: list[str] = Field(default_factory=lambda: ["East", "Central"])
+    verticals: list[str] = Field(default_factory=list)
+    lookback_days: int = Field(default=60, ge=14, le=365)
+    campaign_goal: str = "Increase qualified pipeline and improve conversion through technical-proof-led campaigns."
+
+
+class MarketingFullSolutionResponse(BaseModel):
+    phase_1_modules: list[str]
+    intelligence: MarketingIntelligenceResponse
+    phase_2_campaign_plan: list[str]
+    phase_2_targeting_matrix: list[dict[str, str]]
+    phase_3_assets: list[AssetPackItem]
+    phase_3_measurement_plan: list[str]
+    citations: list[Citation] = Field(default_factory=list)

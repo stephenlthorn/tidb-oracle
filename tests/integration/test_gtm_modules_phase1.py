@@ -152,6 +152,71 @@ def test_marketing_intelligence_endpoint(client):
     assert isinstance(data.get("next_actions"), list)
 
 
+def test_rep_full_solution_endpoint(client):
+    _seed_calls(client)
+
+    res = client.post(
+        "/rep/full-solution",
+        json={
+            "user": "estyn.c@pingcap.com",
+            "account": "Evernorth",
+            "count": 5,
+            "mode": "draft",
+            "to": ["estyn.c@pingcap.com"],
+            "cc": ["se.demo@pingcap.com"],
+            "tone": "executive",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data.get("phase_1_modules"), list)
+    assert isinstance(data.get("phase_2_execution_focus"), list)
+    assert isinstance(data.get("phase_3_assets"), list)
+    assert isinstance(data.get("account_brief"), dict)
+    assert isinstance(data.get("follow_up_draft"), dict)
+
+
+def test_se_full_solution_endpoint(client):
+    _seed_calls(client)
+
+    res = client.post(
+        "/se/full-solution",
+        json={
+            "user": "se.demo@pingcap.com",
+            "account": "Evernorth",
+            "target_offering": "TiDB Cloud Dedicated",
+            "competitor": "SingleStore",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data.get("phase_1_modules"), list)
+    assert isinstance(data.get("phase_2_validation_matrix"), list)
+    assert isinstance(data.get("phase_3_assets"), list)
+    assert isinstance(data.get("poc_plan"), dict)
+
+
+def test_marketing_full_solution_endpoint(client):
+    _seed_calls(client)
+
+    res = client.post(
+        "/marketing/full-solution",
+        json={
+            "user": "marketing@pingcap.com",
+            "regions": ["East", "Central"],
+            "verticals": ["Healthcare", "Retail"],
+            "lookback_days": 60,
+            "campaign_goal": "Increase qualified healthcare opportunities in East/Central this quarter.",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data.get("phase_1_modules"), list)
+    assert isinstance(data.get("intelligence"), dict)
+    assert isinstance(data.get("phase_2_campaign_plan"), list)
+    assert isinstance(data.get("phase_3_measurement_plan"), list)
+
+
 def test_feature_flag_can_disable_rep_module(client):
     put = client.put(
         "/admin/kb-config",

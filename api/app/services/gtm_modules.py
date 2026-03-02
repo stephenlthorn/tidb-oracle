@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Any
 
@@ -130,10 +131,51 @@ class GTMModuleService:
                     "quote": GTMModuleService._citation_quote(hit.text),
                     "relevance": hit.score,
                     "file_id": hit.file_id,
-                    "timestamp": hit.metadata.get("start_time_sec"),
+                    "timestamp": (
+                        str(hit.metadata.get("start_time_sec"))
+                        if hit.metadata.get("start_time_sec") is not None
+                        else None
+                    ),
                 }
             )
         return out
+
+    @staticmethod
+    def _json_safe(payload: dict[str, Any]) -> dict[str, Any]:
+        return json.loads(json.dumps(payload, default=str))
+
+    @staticmethod
+    def _merge_citations(*citation_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        deduped: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for group in citation_groups:
+            for item in group or []:
+                key = (
+                    str(item.get("chunk_id") or ""),
+                    str(item.get("source_id") or ""),
+                    str(item.get("title") or ""),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                deduped.append(item)
+        return deduped[:10]
+
+    @staticmethod
+    def _retrieval_from_citations(citations: list[dict[str, Any]]) -> dict[str, Any]:
+        results: list[dict[str, Any]] = []
+        for item in citations:
+            chunk_id = item.get("chunk_id")
+            if not chunk_id:
+                continue
+            results.append(
+                {
+                    "chunk_id": chunk_id,
+                    "document_id": item.get("source_id"),
+                    "score": float(item.get("relevance") or 0.0),
+                }
+            )
+        return {"top_k": len(results), "results": results[:10]}
 
     def _latest_call(self, account: str, chorus_call_id: str | None) -> tuple[ChorusCall | None, CallArtifact | None]:
         if chorus_call_id:
@@ -174,9 +216,9 @@ class GTMModuleService:
         row = GTMModuleRun(
             module_name=module_name,
             actor=actor,
-            input_json=input_payload,
-            retrieval_json=retrieval_payload,
-            output_json=output_payload,
+            input_json=self._json_safe(input_payload),
+            retrieval_json=self._json_safe(retrieval_payload),
+            output_json=self._json_safe(output_payload),
             status=status,
             error_message=error_message,
         )
@@ -907,6 +949,427 @@ class GTMModuleService:
             input_payload={"regions": regions, "verticals": verticals, "lookback_days": lookback_days},
             retrieval_payload=retrieval,
             output_payload=payload,
+            status=AuditStatus.OK.value,
+        )
+        return payload, retrieval
+
+    def rep_full_solution(
+        self,
+        *,
+        user: str,
+        account: str,
+        chorus_call_id: str | None,
+        count: int,
+        requested_mode: str,
+        to: list[str],
+        cc: list[str],
+        tone: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        brief, _ = self.rep_account_brief(user=user, account=account, chorus_call_id=chorus_call_id)
+        questions, _ = self.rep_discovery_questions(
+            user=user,
+            account=account,
+            chorus_call_id=chorus_call_id,
+            count=count,
+        )
+        risk, _ = self.rep_deal_risk(user=user, account=account, chorus_call_id=chorus_call_id)
+        draft, _ = self.rep_follow_up_draft(
+            user=user,
+            account=account,
+            chorus_call_id=chorus_call_id,
+            requested_mode=requested_mode,
+            to=to,
+            cc=cc,
+            tone=tone,
+        )
+
+        top_risks = [f"{item['severity'].upper()}: {item['signal']}" for item in (risk.get("risks") or [])[:3]]
+        execution_focus = [
+            f"Decision criteria alignment: {item}" for item in (brief.get("decision_criteria") or [])[:2]
+        ] + top_risks[:2]
+        if not execution_focus:
+            execution_focus = [
+                "Confirm technical + commercial success criteria with buyer committee.",
+                "Lock next checkpoint with explicit owner/date per action.",
+            ]
+
+        weekly_cadence = [
+            "Monday: Review deal risk burn-down with AE/SE owners.",
+            "Tuesday: Send account-specific follow-up and asset links.",
+            "Wednesday: Validate discovery gap closure with customer champion.",
+            "Thursday: Update forecast confidence based on technical evidence.",
+            "Friday: Publish executive summary and next-week blockers.",
+        ]
+
+        phase_3_assets = [
+            {
+                "asset_type": "account_brief",
+                "title": f"{account} account brief",
+                "owner": user,
+                "purpose": "Align sales, SE, and leadership on the current decision path.",
+            },
+            {
+                "asset_type": "discovery_questions",
+                "title": f"{account} next-call question set",
+                "owner": user,
+                "purpose": "Drive sharper discovery and measurable qualification evidence.",
+            },
+            {
+                "asset_type": "risk_register",
+                "title": f"{account} risk register",
+                "owner": user,
+                "purpose": "Track blockers with mitigation owners and due dates.",
+            },
+            {
+                "asset_type": "email",
+                "title": draft.get("subject", f"{account} follow-up draft"),
+                "owner": user,
+                "purpose": "Move actions forward immediately after the latest customer interaction.",
+            },
+        ]
+        automation_next_steps = [
+            "Auto-run this full pack after each Chorus sync.",
+            "Post daily top-risk digest to internal Slack channel.",
+            "Create weekly manager summary from module runs and forecast deltas.",
+        ]
+
+        citations = self._merge_citations(
+            brief.get("citations", []),
+            questions.get("citations", []),
+            risk.get("citations", []),
+            draft.get("citations", []),
+        )
+        payload = {
+            "account": account,
+            "phase_1_modules": [
+                "rep_account_brief",
+                "rep_discovery_questions",
+                "rep_deal_risk",
+                "rep_follow_up_draft",
+            ],
+            "account_brief": brief,
+            "discovery_questions": questions,
+            "deal_risk": risk,
+            "follow_up_draft": draft,
+            "phase_2_execution_focus": execution_focus,
+            "phase_2_weekly_cadence": weekly_cadence,
+            "phase_3_assets": phase_3_assets,
+            "phase_3_automation_next_steps": automation_next_steps,
+            "citations": citations,
+        }
+
+        pack_content = json.dumps(
+            {
+                "phase_2_execution_focus": execution_focus,
+                "phase_2_weekly_cadence": weekly_cadence,
+                "phase_3_assets": phase_3_assets,
+                "phase_3_automation_next_steps": automation_next_steps,
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        self.db.add(
+            GTMGeneratedAsset(
+                account=account,
+                module_name="rep.full_solution",
+                asset_type="solution_pack",
+                title=f"{account} full rep solution pack",
+                content=pack_content,
+                metadata_json={"phase_count": 3},
+                content_hash=sha256_text(pack_content),
+                created_by=user,
+            )
+        )
+        self.db.commit()
+
+        retrieval = self._retrieval_from_citations(citations)
+        self._record_module_run(
+            module_name="rep.full_solution",
+            actor=user,
+            input_payload={
+                "account": account,
+                "chorus_call_id": chorus_call_id,
+                "count": count,
+                "mode": requested_mode,
+                "to": to,
+                "cc": cc,
+                "tone": tone,
+            },
+            retrieval_payload=retrieval,
+            output_payload={k: v for k, v in payload.items() if k != "citations"},
+            status=AuditStatus.OK.value,
+        )
+        return payload, retrieval
+
+    def se_full_solution(
+        self,
+        *,
+        user: str,
+        account: str,
+        chorus_call_id: str | None,
+        target_offering: str,
+        competitor: str | None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        poc_plan, _ = self.se_poc_plan(
+            user=user,
+            account=account,
+            chorus_call_id=chorus_call_id,
+            target_offering=target_offering,
+        )
+        readiness, _ = self.se_poc_readiness(user=user, account=account, chorus_call_id=chorus_call_id)
+        architecture, _ = self.se_architecture_fit(user=user, account=account, chorus_call_id=chorus_call_id)
+        coach, _ = self.se_competitor_coach(
+            user=user,
+            account=account,
+            chorus_call_id=chorus_call_id,
+            competitor=competitor,
+        )
+
+        validation_matrix = [
+            {
+                "check": "Latency SLO",
+                "target": "Meet agreed p95/p99 targets on top 10 queries.",
+                "owner": "SE",
+                "evidence": "POC benchmark report + query traces",
+            },
+            {
+                "check": "Ingest throughput",
+                "target": "Sustain peak write profile without error spikes.",
+                "owner": "SE + Customer DBA",
+                "evidence": "Load test metrics and incident-free run logs",
+            },
+            {
+                "check": "Operational migration path",
+                "target": "Validate rollback-safe cutover for one domain/service.",
+                "owner": "SE + Customer Architect",
+                "evidence": "Cutover runbook and rehearsal outcome",
+            },
+            {
+                "check": "Competitive proof",
+                "target": f"Show workload-matched differentiation vs {coach.get('competitor')}.",
+                "owner": "SE",
+                "evidence": "Side-by-side findings with customer stakeholders",
+            },
+        ]
+        red_flags = [
+            *list(readiness.get("blockers") or [])[:2],
+            *list(architecture.get("watchouts") or [])[:2],
+        ]
+        if not red_flags:
+            red_flags = [
+                "Success criteria sign-off path is unclear.",
+                "Production-like data readiness is not yet confirmed.",
+            ]
+
+        phase_3_assets = [
+            {
+                "asset_type": "poc_plan",
+                "title": f"{account} POC workplan and criteria",
+                "owner": user,
+                "purpose": "Drive a milestone-based technical evaluation.",
+            },
+            {
+                "asset_type": "architecture_brief",
+                "title": f"{account} architecture fit memo",
+                "owner": user,
+                "purpose": "Align technical stakeholders on migration path and watchouts.",
+            },
+            {
+                "asset_type": "competitor_coach",
+                "title": f"{account} competitor coaching brief",
+                "owner": user,
+                "purpose": "Equip AE/SE with evidence-based technical positioning.",
+            },
+        ]
+        handoff_notes = [
+            "Send validation matrix to AE + customer champion before next technical session.",
+            "Tag unresolved blockers with owner/date in the shared action tracker.",
+            "Prepare executive-ready technical summary for business case meeting.",
+        ]
+
+        citations = self._merge_citations(
+            poc_plan.get("citations", []),
+            readiness.get("citations", []),
+            architecture.get("citations", []),
+            coach.get("citations", []),
+        )
+        payload = {
+            "account": account,
+            "phase_1_modules": [
+                "se_poc_plan",
+                "se_poc_readiness",
+                "se_architecture_fit",
+                "se_competitor_coach",
+            ],
+            "poc_plan": poc_plan,
+            "poc_readiness": readiness,
+            "architecture_fit": architecture,
+            "competitor_coach": coach,
+            "phase_2_validation_matrix": validation_matrix,
+            "phase_2_red_flags": red_flags,
+            "phase_3_assets": phase_3_assets,
+            "phase_3_handoff_notes": handoff_notes,
+            "citations": citations,
+        }
+
+        pack_content = json.dumps(
+            {
+                "phase_2_validation_matrix": validation_matrix,
+                "phase_2_red_flags": red_flags,
+                "phase_3_assets": phase_3_assets,
+                "phase_3_handoff_notes": handoff_notes,
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        self.db.add(
+            GTMGeneratedAsset(
+                account=account,
+                module_name="se.full_solution",
+                asset_type="solution_pack",
+                title=f"{account} full SE solution pack",
+                content=pack_content,
+                metadata_json={"phase_count": 3, "target_offering": target_offering},
+                content_hash=sha256_text(pack_content),
+                created_by=user,
+            )
+        )
+        self.db.commit()
+
+        retrieval = self._retrieval_from_citations(citations)
+        self._record_module_run(
+            module_name="se.full_solution",
+            actor=user,
+            input_payload={
+                "account": account,
+                "chorus_call_id": chorus_call_id,
+                "target_offering": target_offering,
+                "competitor": competitor,
+            },
+            retrieval_payload=retrieval,
+            output_payload={k: v for k, v in payload.items() if k != "citations"},
+            status=AuditStatus.OK.value,
+        )
+        return payload, retrieval
+
+    def marketing_full_solution(
+        self,
+        *,
+        user: str,
+        regions: list[str],
+        verticals: list[str],
+        lookback_days: int,
+        campaign_goal: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        intelligence, _ = self.marketing_intelligence(
+            user=user,
+            regions=regions,
+            verticals=verticals,
+            lookback_days=lookback_days,
+        )
+
+        query = " ".join(["TiDB GTM signals", *regions, *verticals]).strip()
+        hits = self.retriever.search(
+            query,
+            top_k=10,
+            filters={
+                "source_type": [SourceType.GOOGLE_DRIVE.value, SourceType.FEISHU.value, SourceType.CHORUS.value],
+                "viewer_email": (user or "").strip().lower(),
+            },
+        )
+        citations = self._citations(hits, 10)
+
+        campaign_plan = [
+            f"North-star goal: {campaign_goal}",
+            "Build two vertical narratives mapped to top technical objections.",
+            "Pair each campaign with one customer story + one benchmark artifact.",
+            "Run weekly AE/SE/Marketing sync for top 10 active opportunities.",
+            "Publish stage-conversion and response-rate scoreboard every Friday.",
+        ]
+        targeting_matrix: list[dict[str, str]] = []
+        selected_verticals = verticals or ["Healthcare", "Financial Services", "Retail"]
+        for region in regions or ["East", "Central"]:
+            for vertical in selected_verticals[:3]:
+                targeting_matrix.append(
+                    {
+                        "region": region,
+                        "vertical": vertical,
+                        "primary_message": "Proof-driven HTAP value with migration confidence",
+                        "offer": "Technical deep dive + benchmark review session",
+                    }
+                )
+        phase_3_assets = [
+            {
+                "asset_type": "campaign_brief",
+                "title": "Regional campaign brief",
+                "owner": user,
+                "purpose": "Align messaging, segment targeting, and funnel goals.",
+            },
+            {
+                "asset_type": "email_sequence",
+                "title": "3-touch outbound sequence",
+                "owner": user,
+                "purpose": "Drive discovery meetings with technical proof points.",
+            },
+            {
+                "asset_type": "webinar_outline",
+                "title": "Technical value webinar outline",
+                "owner": user,
+                "purpose": "Scale demand generation for priority verticals.",
+            },
+        ]
+        measurement_plan = [
+            "Track MQL->SQL conversion by region and vertical weekly.",
+            "Measure campaign-assisted progression for top opportunities.",
+            "Review win/loss signal deltas tied to campaign assets used.",
+        ]
+
+        payload = {
+            "phase_1_modules": ["marketing_intelligence"],
+            "intelligence": intelligence,
+            "phase_2_campaign_plan": campaign_plan,
+            "phase_2_targeting_matrix": targeting_matrix,
+            "phase_3_assets": phase_3_assets,
+            "phase_3_measurement_plan": measurement_plan,
+            "citations": citations,
+        }
+
+        pack_content = json.dumps(
+            {
+                "phase_2_campaign_plan": campaign_plan,
+                "phase_2_targeting_matrix": targeting_matrix,
+                "phase_3_assets": phase_3_assets,
+                "phase_3_measurement_plan": measurement_plan,
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        self.db.add(
+            GTMGeneratedAsset(
+                account=", ".join(regions) or "All Regions",
+                module_name="marketing.full_solution",
+                asset_type="solution_pack",
+                title="Marketing full solution pack",
+                content=pack_content,
+                metadata_json={"phase_count": 3, "verticals": verticals},
+                content_hash=sha256_text(pack_content),
+                created_by=user,
+            )
+        )
+        self.db.commit()
+
+        retrieval = self.retriever.retrieval_payload(hits, 10)
+        self._record_module_run(
+            module_name="marketing.full_solution",
+            actor=user,
+            input_payload={
+                "regions": regions,
+                "verticals": verticals,
+                "lookback_days": lookback_days,
+                "campaign_goal": campaign_goal,
+            },
+            retrieval_payload=retrieval,
+            output_payload={k: v for k, v in payload.items() if k != "citations"},
             status=AuditStatus.OK.value,
         )
         return payload, retrieval
