@@ -9,7 +9,12 @@ export default async function AppLayout({ children }) {
   return (
     <div className="shell">
       <Sidebar email={email} hasSession={hasSession} />
-      <div className="main">{children}</div>
+      <div className="main">
+        <div className="internal-reminder">
+          Internal only - do not share outside PingCAP.
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

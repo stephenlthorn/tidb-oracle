@@ -25,7 +25,7 @@ def test_chat_returns_answer_citations_followups(client):
     assert "follow_up_questions" in data
     assert isinstance(data["follow_up_questions"], list)
     assert len(data["citations"]) > 0
-    assert not [c for c in data["citations"] if c.get("source_type") == "chorus"]
+    assert any(c.get("source_type") in {"google_drive", "chorus"} for c in data["citations"])
 
 
 def test_chat_fails_safe_when_retrieval_is_empty(client):

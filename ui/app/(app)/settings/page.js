@@ -1,5 +1,9 @@
 import { getSession } from '../../../lib/session';
 import { apiGet } from '../../../lib/api';
+import GoogleDrivePanel from '../../../components/GoogleDrivePanel';
+import FeishuPanel from '../../../components/FeishuPanel';
+import PersonaPromptPanel from '../../../components/PersonaPromptPanel';
+import GTMFeaturePanel from '../../../components/GTMFeaturePanel';
 
 export default async function SettingsPage() {
   const session = await getSession();
@@ -10,9 +14,17 @@ export default async function SettingsPage() {
     : 0;
 
   let liveModel = 'gpt-5.3-codex';
+  let personaName = 'sales_representative';
+  let personaPrompt = '';
+  let sePocKitUrl = '';
+  let featureFlags = {};
   try {
     const cfg = await apiGet('/admin/kb-config');
     if (cfg?.llm_model) liveModel = cfg.llm_model;
+    if (cfg?.persona_name) personaName = cfg.persona_name;
+    if (cfg?.persona_prompt) personaPrompt = cfg.persona_prompt;
+    if (cfg?.se_poc_kit_url) sePocKitUrl = cfg.se_poc_kit_url;
+    if (cfg?.feature_flags_json && typeof cfg.feature_flags_json === 'object') featureFlags = cfg.feature_flags_json;
   } catch {
     // silently use default
   }
@@ -77,6 +89,12 @@ export default async function SettingsPage() {
             ))}
           </div>
         </div>
+
+        <GoogleDrivePanel />
+        <FeishuPanel />
+
+        <PersonaPromptPanel initialPersona={personaName} initialPrompt={personaPrompt} />
+        <GTMFeaturePanel initialPocKitUrl={sePocKitUrl} initialFeatureFlags={featureFlags} />
 
         <div className="panel">
           <div className="panel-header">

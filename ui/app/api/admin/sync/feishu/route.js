@@ -6,7 +6,12 @@ export async function POST() {
   const session = await getSession();
   const res = await fetch(`${API_BASE}/admin/sync/feishu`, {
     method: 'POST',
-    headers: session ? { 'X-OpenAI-Token': session.access_token } : {},
+    headers: session
+      ? {
+          'X-OpenAI-Token': session.access_token,
+          'X-User-Email': session.email || '',
+        }
+      : {},
   });
   const data = await res.json();
   return Response.json(data, { status: res.status });

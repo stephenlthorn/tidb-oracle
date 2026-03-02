@@ -176,6 +176,21 @@ a:hover { text-decoration: underline; }
   overflow: auto;
 }
 
+.internal-reminder {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.35);
+  background:
+    linear-gradient(to right, rgba(127, 29, 29, 0.92), rgba(69, 10, 10, 0.92));
+  color: #fecaca;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.36rem 1.25rem;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -487,6 +502,63 @@ textarea.input {
   color: var(--text-3);
 }
 
+/* ── Knowledge source list ── */
+.knowledge-toolbar {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.knowledge-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.knowledge-list {
+  list-style: none;
+  margin-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.knowledge-item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.62rem 0.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.knowledge-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.knowledge-title {
+  font-size: 0.81rem;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.knowledge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+
+.knowledge-snippet {
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
 /* ── Login page ── */
 .login-shell {
   min-height: 100vh;
@@ -496,7 +568,7 @@ textarea.input {
 }
 
 .login-card {
-  width: 360px;
+  width: min(560px, 92vw);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -526,6 +598,42 @@ textarea.input {
   font-weight: 600;
   color: var(--text);
   margin-bottom: 0.35rem;
+}
+
+.classified-warning {
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 6px;
+  background:
+    linear-gradient(to bottom, rgba(69, 10, 10, 0.9), rgba(31, 41, 55, 0.9));
+  margin-bottom: 1.2rem;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.2);
+}
+
+.classified-warning-head {
+  padding: 0.45rem 0.75rem;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(248, 113, 113, 0.16),
+      rgba(248, 113, 113, 0.16) 10px,
+      rgba(153, 27, 27, 0.16) 10px,
+      rgba(153, 27, 27, 0.16) 20px
+    );
+  border-bottom: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.classified-warning-text {
+  margin: 0;
+  padding: 0.65rem 0.75rem 0.75rem;
+  color: #fca5a5;
+  font-size: 0.75rem;
+  line-height: 1.55;
 }
 
 .login-sub {
@@ -587,4 +695,5 @@ pre {
   .sidebar { height: auto; position: static; flex-direction: row; flex-wrap: wrap; }
   .sidebar-nav { flex-direction: row; flex-wrap: wrap; }
   .two-col, .three-col { grid-template-columns: 1fr; }
+  .internal-reminder { padding: 0.38rem 0.75rem; font-size: 0.62rem; }
 }

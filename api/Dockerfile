@@ -11,6 +11,7 @@ COPY api/pyproject.toml /app/pyproject.toml
 COPY api/app /app/app
 COPY api/alembic.ini /app/alembic.ini
 COPY api/alembic /app/alembic
+COPY api/service-account.json /app/service-account.json
 COPY data /app/data
 
 RUN pip install --upgrade pip && pip install -e .

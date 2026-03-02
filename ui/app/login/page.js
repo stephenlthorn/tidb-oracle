@@ -45,6 +45,14 @@ export default function LoginPage() {
           </div>
         </div>
 
+        <div className="classified-warning">
+          <div className="classified-warning-head">Restricted Internal System</div>
+          <p className="classified-warning-text">
+            This platform is for PingCAP employees only. Do not disclose, discuss, or demonstrate this system
+            outside PingCAP. Unauthorized external sharing is prohibited.
+          </p>
+        </div>
+
         <p className="login-heading">Sign in to continue</p>
         <p className="login-sub">
           Uses ChatGPT OAuth. For guaranteed API access, you can also configure `OPENAI_API_KEY`.
