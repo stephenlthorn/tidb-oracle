@@ -33,3 +33,18 @@ def test_drive_oauth_exchange_returns_400_on_invalid_state(client, monkeypatch):
 
     assert res.status_code == 400
     assert "state" in (res.json().get("detail") or "").lower()
+
+
+def test_sync_drive_returns_400_for_missing_user_oauth(client, monkeypatch):
+    class FakeIngestor:
+        def __init__(self, db):
+            self.db = db
+
+        def sync(self, since=None, progress=None, user_email=None):
+            raise RuntimeError("Google Drive is not connected for this user.")
+
+    monkeypatch.setattr(admin, "DriveIngestor", FakeIngestor)
+
+    res = client.post("/admin/sync/drive", headers={"X-User-Email": "rep@pingcap.com"})
+    assert res.status_code == 400
+    assert "not connected" in (res.json().get("detail") or "").lower()

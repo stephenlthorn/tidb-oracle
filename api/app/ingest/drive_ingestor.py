@@ -97,12 +97,10 @@ class DriveIngestor:
     ) -> dict:
         normalized_user = (user_email or "").strip().lower() or None
         if normalized_user:
-            try:
-                creds = self.credential_service.get_google_credentials(normalized_user)
-                self.connector = DriveConnector(oauth_credentials=creds)
-            except RuntimeError:
-                # Allow service-account mode for teams that haven't completed per-user OAuth yet.
-                self.connector = DriveConnector()
+            # Per-user sync must remain user-scoped; do not silently fall back
+            # to service-account/global mode when OAuth credentials are missing/invalid.
+            creds = self.credential_service.get_google_credentials(normalized_user)
+            self.connector = DriveConnector(oauth_credentials=creds)
 
         files = self.connector.list_files(since=since, progress=progress)
         indexed = 0

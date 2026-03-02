@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from app.models import KBChunk, KBDocument, SourceType
 from app.ingest.drive_ingestor import DriveIngestor
 from app.retrieval.service import HybridRetriever
@@ -174,3 +176,24 @@ def test_kb_routes_allow_google_shared_drive_docs_without_user_tag(client, db_se
 
     inspect_blocked = client.get("/kb/inspect/drive_restricted_route_1", headers=headers)
     assert inspect_blocked.status_code == 404
+
+
+def test_drive_ingestor_user_scoped_sync_does_not_fallback_to_service_account(db_session, monkeypatch):
+    ingestor = DriveIngestor(db_session)
+
+    called = {"list_files": False}
+
+    def fake_get_creds(user_email):
+        raise RuntimeError("Google Drive is not connected for this user.")
+
+    def fake_list_files(*args, **kwargs):
+        called["list_files"] = True
+        return []
+
+    monkeypatch.setattr(ingestor.credential_service, "get_google_credentials", fake_get_creds)
+    monkeypatch.setattr(ingestor.connector, "list_files", fake_list_files)
+
+    with pytest.raises(RuntimeError):
+        ingestor.sync(user_email="rep@pingcap.com")
+
+    assert called["list_files"] is False

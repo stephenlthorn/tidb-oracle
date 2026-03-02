@@ -142,7 +142,10 @@ def sync_drive(
     user_email = _request_user_email(request)
     since_dt = isoparse(since) if since else None
     ingestor = DriveIngestor(db)
-    result = ingestor.sync(since=since_dt, user_email=user_email)
+    try:
+        result = ingestor.sync(since=since_dt, user_email=user_email)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     write_audit_log(
         db,
         actor=user_email or "system",
