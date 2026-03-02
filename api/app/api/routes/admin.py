@@ -229,11 +229,14 @@ def drive_oauth_exchange(
     if not settings.google_drive_client_id or not settings.google_drive_client_secret:
         raise HTTPException(status_code=500, detail="Google Drive OAuth client is not configured.")
 
-    pending = google_drive_oauth_state_store.consume(
-        state=state,
-        user_email=user_email,
-        redirect_uri=redirect_uri,
-    )
+    try:
+        pending = google_drive_oauth_state_store.consume(
+            state=state,
+            user_email=user_email,
+            redirect_uri=redirect_uri,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     token_form = {
         "code": code,
         "client_id": settings.google_drive_client_id,

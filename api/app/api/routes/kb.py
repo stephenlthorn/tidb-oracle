@@ -80,7 +80,8 @@ def list_documents(
         for doc in docs:
             if doc.source_type == SourceType.GOOGLE_DRIVE:
                 tags = doc.tags if isinstance(doc.tags, dict) else {}
-                if str(tags.get("user_email", "")).strip().lower() != viewer_email:
+                indexed_for = str(tags.get("user_email", "")).strip().lower()
+                if indexed_for and indexed_for != viewer_email:
                     continue
             if doc.source_type == SourceType.FEISHU:
                 tags = doc.tags if isinstance(doc.tags, dict) else {}
@@ -186,7 +187,7 @@ def fulltext_search_kb(
         if viewer_email and doc.source_type == SourceType.GOOGLE_DRIVE:
             tags = doc.tags if isinstance(doc.tags, dict) else {}
             indexed_for = str(tags.get("user_email", "")).strip().lower()
-            if indexed_for != viewer_email:
+            if indexed_for and indexed_for != viewer_email:
                 continue
         if viewer_email and doc.source_type == SourceType.FEISHU:
             tags = doc.tags if isinstance(doc.tags, dict) else {}
@@ -241,7 +242,8 @@ def inspect_file(file_id: str, request: Request = None, db: Session = Depends(db
         raise HTTPException(status_code=404, detail="file not found")
     if viewer_email and doc.source_type == SourceType.GOOGLE_DRIVE:
         tags = doc.tags if isinstance(doc.tags, dict) else {}
-        if str(tags.get("user_email", "")).strip().lower() != viewer_email:
+        indexed_for = str(tags.get("user_email", "")).strip().lower()
+        if indexed_for and indexed_for != viewer_email:
             raise HTTPException(status_code=404, detail="file not found")
     if viewer_email and doc.source_type == SourceType.FEISHU:
         tags = doc.tags if isinstance(doc.tags, dict) else {}

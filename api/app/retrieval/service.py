@@ -108,7 +108,8 @@ class HybridRetriever:
         if viewer_email and doc.source_type.value == "google_drive":
             tags = doc.tags if isinstance(doc.tags, dict) else {}
             indexed_for = str(tags.get("user_email", "")).strip().lower()
-            if indexed_for != viewer_email:
+            # Shared Drive/service-account indexed content can legitimately omit user_email.
+            if indexed_for and indexed_for != viewer_email:
                 return False
         if viewer_email and doc.source_type.value == "feishu":
             tags = doc.tags if isinstance(doc.tags, dict) else {}
