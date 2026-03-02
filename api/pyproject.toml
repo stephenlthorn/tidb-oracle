@@ -12,6 +12,7 @@ dependencies = [
   "uvicorn[standard]>=0.30.0",
   "sqlalchemy>=2.0.30",
   "psycopg[binary]>=3.1.18",
+  "pymysql>=1.1.1",
   "pgvector>=0.3.2",
   "alembic>=1.13.2",
   "pydantic>=2.8.2",
@@ -28,7 +29,8 @@ dependencies = [
   ,
   "google-api-python-client>=2.151.0",
   "google-auth>=2.34.0",
-  "google-auth-oauthlib>=1.2.1"
+  "google-auth-oauthlib>=1.2.1",
+  "cryptography>=43.0.1"
 ]
 
 [project.optional-dependencies]

@@ -11,6 +11,10 @@ TEST_DB = Path(__file__).resolve().parent / "test.db"
 os.environ.setdefault("DATABASE_URL", f"sqlite+pysqlite:///{TEST_DB}")
 os.environ.setdefault("AUTO_CREATE_SCHEMA", "true")
 os.environ.setdefault("OPENAI_API_KEY", "")
+os.environ.setdefault("OPENAI_BASE_URL", "")
+os.environ.setdefault("CHORUS_API_KEY", "")
+os.environ.setdefault("CHORUS_BASE_URL", "")
+os.environ.setdefault("DISABLE_CODEX_AUTH", "true")
 
 from app.db.base import Base
 from app.db.session import SessionLocal, engine

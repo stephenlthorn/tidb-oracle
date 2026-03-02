@@ -1,6 +1,7 @@
 import { apiGet } from '../../../lib/api';
 import { FAKE_CALLS } from '../../../data/fake-calls';
 import KBConfigPanel from '../../../components/KBConfigPanel';
+import KnowledgeSourcesPanel from '../../../components/KnowledgeSourcesPanel';
 
 const SAMPLE_AUDITS = [
   { id: '1', action: 'sync_drive', status: 'ok', actor: 'system', ts: '2026-02-19T10:02:00Z' },
@@ -11,14 +12,15 @@ const SAMPLE_AUDITS = [
 ];
 
 const SAMPLE_DOCS = [
-  { title: 'TiDB GTM Positioning Playbook', source: 'google_drive', indexed: '2026-02-18' },
-  { title: 'TiFlash Sizing FAQ', source: 'google_drive', indexed: '2026-02-18' },
-  { title: 'Online DDL Objection Handling', source: 'google_drive', indexed: '2026-02-18' },
+  { title: 'TiDB GTM Positioning Playbook', source_type: 'google_drive', source_id: 'drive_001', modified_time: '2026-02-18' },
+  { title: 'TiFlash Sizing FAQ', source_type: 'google_drive', source_id: 'drive_002', modified_time: '2026-02-18' },
+  { title: 'Online DDL Objection Handling', source_type: 'google_drive', source_id: 'drive_003', modified_time: '2026-02-18' },
+  { title: 'Feishu: Enterprise Security FAQ', source_type: 'feishu', source_id: 'feishu_001', modified_time: '2026-02-18' },
 ];
 
 export default async function AdminPage() {
   const [docsRaw, auditsRaw] = await Promise.all([
-    apiGet('/kb/documents?limit=30').catch(() => []),
+    apiGet('/kb/documents?limit=300').catch(() => []),
     apiGet('/admin/audit?limit=30').catch(() => []),
   ]);
 
@@ -56,26 +58,7 @@ export default async function AdminPage() {
         <KBConfigPanel />
 
         <div className="two-col">
-          <div className="panel">
-            <div className="panel-header">
-              <span className="panel-title">Knowledge Base</span>
-              <span className="tag">{docs.length} docs</span>
-            </div>
-            <table className="data-table">
-              <thead>
-                <tr><th>Title</th><th>Source</th><th>Indexed</th></tr>
-              </thead>
-              <tbody>
-                {docs.slice(0, 10).map((d, i) => (
-                  <tr key={d.id || i}>
-                    <td className="row-title">{d.title}</td>
-                    <td style={{ color: 'var(--text-3)' }}>{d.source_type || d.source || '—'}</td>
-                    <td style={{ color: 'var(--text-3)' }}>{d.indexed || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <KnowledgeSourcesPanel docs={docs} />
 
           <div className="panel">
             <div className="panel-header">

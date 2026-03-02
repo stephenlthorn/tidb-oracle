@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     google_drive_client_secret: str | None = None
     google_drive_service_account_json: str | None = None
     google_drive_oauth_token_path: str = ".google-drive-token.json"
+    google_drive_token_encryption_key: str | None = None
+    google_drive_oauth_state_ttl_seconds: int = 600
     google_drive_root_folder_id: str | None = None
     fake_drive_include_github: bool = False
     google_drive_folder_ids: str = ""
@@ -48,6 +50,8 @@ class Settings(BaseSettings):
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
     feishu_base_url: str = "https://open.feishu.cn/open-apis"
+    feishu_oauth_state_ttl_seconds: int = 600
+    feishu_oauth_scopes: str = "offline_access drive:drive:readonly docs:document:readonly"
 
     chorus_api_key: str | None = None
     chorus_base_url: str | None = None
@@ -61,6 +65,7 @@ class Settings(BaseSettings):
     smtp_from: str = "tidb-oracle@pingcap.com"
 
     slack_bot_token: str | None = None
+    slack_signing_secret: str | None = None
     slack_default_channel: str | None = None
 
     @property

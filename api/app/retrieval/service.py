@@ -104,6 +104,24 @@ class HybridRetriever:
         if source_filter and doc.source_type.value.lower() not in source_filter:
             return False
 
+        viewer_email = str(filters.get("viewer_email") or "").strip().lower()
+        if viewer_email and doc.source_type.value == "google_drive":
+            tags = doc.tags if isinstance(doc.tags, dict) else {}
+            indexed_for = str(tags.get("user_email", "")).strip().lower()
+            # Shared Drive/service-account indexed content can legitimately omit user_email.
+            if indexed_for and indexed_for != viewer_email:
+                return False
+        if viewer_email and doc.source_type.value == "feishu":
+            tags = doc.tags if isinstance(doc.tags, dict) else {}
+            indexed_for = str(tags.get("user_email", "")).strip().lower()
+            if indexed_for and indexed_for != viewer_email:
+                return False
+        if viewer_email and doc.source_type.value == "memory":
+            tags = doc.tags if isinstance(doc.tags, dict) else {}
+            indexed_for = str(tags.get("user_email", "")).strip().lower()
+            if indexed_for and indexed_for != viewer_email:
+                return False
+
         account_filter = {a.lower() for a in (filters.get("account") or [])}
         if account_filter:
             tags = doc.tags if isinstance(doc.tags, dict) else {}
@@ -194,8 +212,14 @@ class HybridRetriever:
                 ).all()
                 rows.extend(keyword_rows)
         else:
-            # SQLite test path: keep retrieval behavior deterministic without pgvector operators.
-            rows.extend(self.db.execute(base_stmt).all())
+            # Non-Postgres path (sqlite/mysql): use bounded candidate sets plus lexical filters.
+            rows.extend(self.db.execute(base_stmt.limit(candidate_limit)).all())
+            if terms:
+                keyword_clauses = [KBChunk.text.ilike(f"%{term}%") for term in terms[:6]]
+                keyword_rows = self.db.execute(
+                    base_stmt.where(or_(*keyword_clauses)).limit(candidate_limit)
+                ).all()
+                rows.extend(keyword_rows)
 
         deduped: dict[str, tuple[KBChunk, KBDocument]] = {}
         for chunk, doc in rows:
@@ -241,7 +265,7 @@ class HybridRetriever:
                     source_id=doc.source_id,
                     title=doc.title,
                     url=doc.url,
-                    file_id=doc.source_id,
+                    file_id=str((doc.tags or {}).get("drive_file_id") or doc.source_id),
                 )
             )
         return hits

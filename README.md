@@ -53,7 +53,7 @@ Internal-only TiDB + PingCAP GTM copilot grounded in Google Drive and Chorus tra
 ## Stack
 
 - Backend: Python 3.11 + FastAPI
-- DB: Postgres 16 + pgvector
+- DB: TiDB Serverless (MySQL wire protocol) or Postgres 16 + pgvector
 - Queue/jobs: Celery + Redis
 - UI: Next.js 14
 - LLM: OpenAI Chat/Embeddings via provider wrapper (deterministic fallback without key)
@@ -73,6 +73,13 @@ cd infra
 docker compose up --build
 ```
 
+Optional: runtime Google service-account secret mount (no secret in image):
+
+```bash
+export GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_FILE=/abs/path/service-account.json
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build
+```
+
 3. Run initial sync:
 
 ```bash
@@ -83,6 +90,9 @@ curl -X POST "http://localhost:8000/admin/sync/chorus"
 4. Open:
 - API docs: <http://localhost:8000/docs>
 - UI: <http://localhost:3000>
+
+Note:
+- ChatGPT OAuth callback uses local port `1455` (`http://localhost:1455/auth/callback`), so keep that port available when running in Docker.
 
 ## GitHub corpus sync (PingCAP repos/docs)
 
@@ -114,6 +124,18 @@ pip install -e .[dev]
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+## TiDB Serverless database setup
+
+Set `DATABASE_URL` to your TiDB Serverless connection string in `.env` and `api/.env`:
+
+```bash
+DATABASE_URL=mysql+pymysql://<user>:<password>@<tidb-host>:4000/<database>?ssl_verify_cert=true&ssl_verify_identity=true
+```
+
+Notes:
+- If you receive `NXDOMAIN` for a `*-privatelink.*` host, your machine is not on the required VPC/DNS path for that PrivateLink endpoint.
+- You can still run locally with SQLite/Postgres; move to TiDB once network routing to the TiDB endpoint is available.
 
 In another shell:
 
@@ -171,19 +193,69 @@ Inspect effective security config at:
 
 Supported modes:
 
-1. Service account (recommended for server ingestion)
+1. Per-user OAuth (recommended for permission inheritance)
+- Each signed-in user connects Google Drive in `Settings -> Google Drive Access`.
+- TiDB Oracle indexes/searches files using that user’s own Drive permissions (My Drive + Shared Drives).
+- Scope: `https://www.googleapis.com/auth/drive.readonly`.
+- Tokens are stored encrypted at rest in DB (`google_drive_user_credentials`).
+- Set:
+  - `GOOGLE_DRIVE_CLIENT_ID`
+  - `GOOGLE_DRIVE_CLIENT_SECRET`
+  - `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` (required in production; 32-byte key or any string to derive one)
+
+2. Service account (optional legacy mode for shared system sync)
 - Set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON=/abs/path/service-account.json`
+- For containers, mount that file at runtime (for example into `/run/secrets/service-account.json`) and set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` to the mounted path.
+- If using Docker Compose, prefer `infra/docker-compose.secrets.yml` and set `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_FILE`.
 - Share target Drive folders/files with the service account.
 
-2. OAuth client
+3. OAuth client token file (legacy local mode)
 - Set `GOOGLE_DRIVE_CLIENT_ID` and `GOOGLE_DRIVE_CLIENT_SECRET`
 - Store authorized token at path set by `GOOGLE_DRIVE_OAUTH_TOKEN_PATH` (default `.google-drive-token.json`)
 - Scope is `drive.readonly`.
+
+### Feishu / Lark
+
+Supported modes:
+
+1. App token mode (shared system sync)
+- Set `FEISHU_APP_ID` and `FEISHU_APP_SECRET`.
+- In `Admin -> Knowledge Base Configuration`, set one or more Feishu root tokens.
+- The Feishu connector recursively traverses configured roots and indexes docs content.
+
+2. Per-user OAuth mode (permission inheritance)
+- Enable `feishu_oauth_enabled` in KB config.
+- Each signed-in user connects Feishu in `Settings -> Feishu / Lark Access`.
+- Sync runs with that user access token; indexed docs are scoped by `user_email` tag for retrieval.
+- Tokens are encrypted at rest in DB (`feishu_user_credentials`).
+
+Optional env:
+- `FEISHU_OAUTH_SCOPES` (default: `offline_access drive:drive:readonly docs:document:readonly`)
+- `FEISHU_OAUTH_STATE_TTL_SECONDS` (default: `600`)
 
 ### Chorus
 
 - Set `CHORUS_API_KEY`
 - Set `CHORUS_BASE_URL` (e.g., `https://api.chorus.ai/v1`)
+
+### Slack
+
+Direct Slack integration is available through API routes:
+- `POST /slack/command` for slash commands
+- `POST /slack/events` for Event Subscriptions (`app_mention`)
+
+Required env vars:
+- `SLACK_SIGNING_SECRET`
+- `SLACK_BOT_TOKEN` (required for `app_mention` responses)
+
+Recommended bot scopes:
+- `commands`
+- `chat:write`
+- `users:read.email` (so TiDB Oracle can map Slack users to Drive-permission-aware email identities)
+
+Command examples:
+- `/tidb-oracle How should we position TiDB for Aurora MySQL at 50TB?`
+- `/tidb-oracle call_assistant: summarize risks for call_12345`
 
 Without creds, connector uses synthetic fixtures in `data/fake_drive` and `data/fake_chorus`.
 
@@ -209,6 +281,20 @@ Output includes:
 - `answer`
 - `citations[]` with `source_id`, `chunk_id`, `quote`, `relevance`
 - `follow_up_questions[]`
+
+### Sales Rep Market Research Strategist
+
+`POST /rep/market-research`
+
+Input expects two CSV payloads:
+- `current_customers_csv` headers: `account,region,industry,current_platform,use_case,arr`
+- `pipeline_csv` headers: `account,region,stage,industry,workload,est_arr,close_quarter,competing_vendor`
+
+Response includes:
+- `summary`
+- `required_inputs[]`
+- `priority_accounts[]`
+- `execution_plan[]`
 
 ### Draft messaging (internal only)
 

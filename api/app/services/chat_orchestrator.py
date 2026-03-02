@@ -3,10 +3,12 @@ from __future__ import annotations
 import re
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.settings import Settings, get_settings
-from app.models import KBConfig, SourceType
+from app.models import ChorusCall, KBConfig, SourceType
+from app.prompts.personas import DEFAULT_PERSONA, get_default_persona_prompt, normalize_persona
 from app.retrieval.service import HybridRetriever
 from app.services.llm import LLMService
 from app.services.query_rewrite import QueryRewriter
@@ -172,13 +174,25 @@ class ChatOrchestrator:
     def _resolve_allowed_sources(kb_config: KBConfig | None, mode: str) -> list[str] | None:
         if mode == "oracle":
             if kb_config is None:
-                return [SourceType.GOOGLE_DRIVE.value, SourceType.FEISHU.value]
+                return [
+                    SourceType.GOOGLE_DRIVE.value,
+                    SourceType.FEISHU.value,
+                    SourceType.CHORUS.value,
+                    SourceType.MEMORY.value,
+                ]
             allowed: list[str] = []
             if kb_config.google_drive_enabled:
                 allowed.append(SourceType.GOOGLE_DRIVE.value)
             if kb_config.feishu_enabled:
                 allowed.append(SourceType.FEISHU.value)
-            return allowed or [SourceType.GOOGLE_DRIVE.value]
+            if kb_config.chorus_enabled:
+                allowed.append(SourceType.CHORUS.value)
+            allowed.append(SourceType.MEMORY.value)
+            deduped: list[str] = []
+            for source in allowed:
+                if source not in deduped:
+                    deduped.append(source)
+            return deduped or [SourceType.GOOGLE_DRIVE.value, SourceType.CHORUS.value, SourceType.MEMORY.value]
         # call_assistant and any other modes: use Chorus only
         if kb_config is None:
             return None
@@ -186,6 +200,22 @@ class ChatOrchestrator:
         if kb_config.chorus_enabled:
             allowed.append(SourceType.CHORUS.value)
         return allowed or None
+
+    def _infer_account_filter(self, message: str) -> list[str] | None:
+        if self.db is None:
+            return None
+        lowered = message.lower()
+        accounts = self.db.execute(select(ChorusCall.account).distinct()).scalars().all()
+        matched: list[str] = []
+        for account in accounts:
+            if not account:
+                continue
+            acct = account.strip()
+            if not acct:
+                continue
+            if acct.lower() in lowered:
+                matched.append(acct)
+        return matched or None
 
     @staticmethod
     def _resolve_llm_config(
@@ -204,6 +234,13 @@ class ChatOrchestrator:
             tools.append({"type": "code_interpreter", "container": {"type": "auto"}})
         return model, tools
 
+    @staticmethod
+    def _resolve_persona_config(kb_config: KBConfig | None) -> tuple[str, str]:
+        persona_name = normalize_persona(kb_config.persona_name if kb_config else DEFAULT_PERSONA)
+        custom_prompt = (kb_config.persona_prompt or "").strip() if kb_config else ""
+        persona_prompt = custom_prompt or get_default_persona_prompt(persona_name)
+        return persona_name, persona_prompt
+
     def run(self, *, mode: str, user: str, message: str, top_k: int, filters: dict, context: dict) -> tuple[dict, dict]:
         blocked = self._guardrail_external_messaging(message)
         if blocked:
@@ -214,20 +251,22 @@ class ChatOrchestrator:
             }
             return payload, {"top_k": 0, "results": []}
 
-        # Oracle mode runs as direct LLM chat only (no internal KB retrieval).
-        if mode == "oracle":
-            llm_model, llm_tools = self._resolve_llm_config(None, self.settings, mode)
-            data = self.llm.answer_oracle(
-                message,
-                [],
-                model=llm_model,
-                tools=llm_tools,
-                allow_ungrounded=True,
-            )
-            data["citations"] = []
-            return data, {"top_k": 0, "results": []}
-
         if self.db is None or self.retriever is None:
+            if mode == "oracle":
+                llm_model, llm_tools = self._resolve_llm_config(None, self.settings, mode)
+                persona_name, persona_prompt = self._resolve_persona_config(None)
+                data = self.llm.answer_oracle(
+                    message,
+                    [],
+                    model=llm_model,
+                    tools=llm_tools,
+                    allow_ungrounded=True,
+                    persona_name=persona_name,
+                    persona_prompt=persona_prompt,
+                )
+                data["citations"] = []
+                return data, {"top_k": 0, "results": []}
+
             data = {
                 "what_happened": ["Transcript mode is unavailable because the internal DB is disabled."],
                 "risks": ["Enable internal DB-backed retrieval to use call assistant mode."],
@@ -241,11 +280,21 @@ class ChatOrchestrator:
         resolved_top_k = self._resolve_top_k(kb_config, top_k)
         allowed_sources = self._resolve_allowed_sources(kb_config, mode)
         llm_model, llm_tools = self._resolve_llm_config(kb_config, self.settings, mode)
+        persona_name, persona_prompt = self._resolve_persona_config(kb_config)
 
         mode_filters = dict(filters or {})
+        mode_filters["viewer_email"] = (user or "").strip().lower()
         requested_sources = [str(s).lower() for s in (mode_filters.get("source_type") or [])]
+        inferred_accounts = self._infer_account_filter(message)
+        if inferred_accounts and not mode_filters.get("account"):
+            mode_filters["account"] = inferred_accounts
         if mode == "oracle":
-            oracle_allowed = allowed_sources or [SourceType.GOOGLE_DRIVE.value, SourceType.FEISHU.value]
+            oracle_allowed = allowed_sources or [
+                SourceType.GOOGLE_DRIVE.value,
+                SourceType.FEISHU.value,
+                SourceType.CHORUS.value,
+                SourceType.MEMORY.value,
+            ]
             if requested_sources:
                 filtered = [source for source in requested_sources if source in set(oracle_allowed)]
                 mode_filters["source_type"] = filtered or oracle_allowed
@@ -272,11 +321,25 @@ class ChatOrchestrator:
         ]
 
         if mode == "call_assistant":
-            data = self.llm.answer_call_assistant(message, hits, model=llm_model, tools=llm_tools)
+            data = self.llm.answer_call_assistant(
+                message,
+                hits,
+                model=llm_model,
+                tools=llm_tools,
+                persona_name=persona_name,
+                persona_prompt=persona_prompt,
+            )
             data["citations"] = citations
             return data, self.retriever.retrieval_payload(hits, resolved_top_k)
 
-        data = self.llm.answer_oracle(message, hits, model=llm_model, tools=llm_tools)
+        data = self.llm.answer_oracle(
+            message,
+            hits,
+            model=llm_model,
+            tools=llm_tools,
+            persona_name=persona_name,
+            persona_prompt=persona_prompt,
+        )
         data["citations"] = citations
         return data, self.retriever.retrieval_payload(hits, resolved_top_k)
     @staticmethod
